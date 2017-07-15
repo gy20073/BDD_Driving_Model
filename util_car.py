@@ -28,13 +28,11 @@ from matplotlib.patches import FancyArrowPatch
 def images2video_highqual(frame_rate,
                  name="temp_name", dir_name="temp_dir"):
 
-
     # make dir if not exists
     if not os.path.isdir(dir_name):
         os.mkdir(dir_name)
     pwd = os.getcwd()
     os.chdir(dir_name)
-
 
     print("converting to video")
     video_name = name+'.mp4'
@@ -77,7 +75,6 @@ def images2video(images, frame_rate,
 
     return os.path.join(dir_name, video_name)
 
-
 def play_video(path):
     video = io.open(path, 'r+b').read()
     encoded = base64.b64encode(video)
@@ -88,7 +85,7 @@ def play_video(path):
 def visualize_images(images, frame_rate,
                      name="temp_name", dir_name="temp_dir",delete_temp=True):
     path = images2video(images, frame_rate, name, dir_name)
-    out=play_video(path)
+    out = play_video(path)
     if delete_temp:
         assert not("*" in dir_name)
         shutil.rmtree(dir_name)
@@ -121,7 +118,6 @@ def write_text_on_image(image, string,
         draw.line(line[0], fill=line[1], width=3)
 
     return np.array(j)
-
 
 def egomotion2animation(ego):
     # ego is a egomotion matrix, with nframes * previous frames * 3
@@ -156,7 +152,6 @@ def egomotion2animation(ego):
     plt.close(anim._fig)
     return anim
 
-
 def animation2HTML(anim, frame_rate):
     print("animaiton to video...")
     if not hasattr(anim, '_encoded_video'):
@@ -172,7 +167,6 @@ def animation2HTML(anim, frame_rate):
             return HTML(data='''<video alt="test" controls>
                             <source src="data:video/mp4;base64,{0}" type="video/mp4" />
                          </video>'''.format(encoded.decode('ascii')))
-
 
 def visualize_egomotion(ego, frame_rate):
     anim = egomotion2animation(ego)
@@ -198,7 +192,6 @@ def vis_reader(tout, frame_rate, j=0):
         images_txt[i, :, :, :] = write_text_on_image(images[i, :, :, :], showing_str)
     print("showing visualization for video %s" % name[0])
     return visualize_images(images_txt, frame_rate)
-
 
 def move_to_line(move, h, w, multiplier = 10):
     m = copy.deepcopy(move)
@@ -228,7 +221,6 @@ def vis_reader_stop_go(tout, prediction,frame_rate,  j=0, save_visualize = False
     stop = isstop[j, :]
     speed = speed[j, :, :]
 
-    
     for i in range(images.shape[0]):
         showing_str = "STOP" if prediction[i] == 1 else "GO!"
         showing_str += "\n" + str(np.linalg.norm(speed[i, :]))
@@ -246,8 +238,6 @@ def vis_reader_stop_go(tout, prediction,frame_rate,  j=0, save_visualize = False
                                 delete_temp=False)
     else:
         return visualize_images(images_txt, frame_rate)
-
-
 
 def vis_discrete(tout, predict, frame_rate,
                  j=0, save_visualize=False, dir_name="temp"):
@@ -271,7 +261,6 @@ def vis_discrete(tout, predict, frame_rate,
         locs = tout[7]
     else:
         decoded, speed, name, isstop, turn, locs = tout
-
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     _, hi, wi, _ = images.shape
@@ -322,7 +311,6 @@ def vis_discrete(tout, predict, frame_rate,
                                 delete_temp=False)
     else:
         return visualize_images(images, frame_rate)
-
 
 def vis_discrete_simplified(tout, predict, frame_rate,
                  j=0, save_visualize=False, dir_name="temp"):
@@ -426,7 +414,6 @@ def draw_sector(image,
     total = total / total_max * 255*green_portion
 
     # assign to image
-    
     image[xy[:, 1], xy[:, 0], :] *= (1-green_portion)
     image[xy[:, 1], xy[:, 0], 1] += total
 
@@ -556,12 +543,6 @@ def visLoc(locs, label="NotSet"):
     plt.xlabel("West -- East")
     plt.ylabel("South -- North")
     plt.show()
-    
-    
-    #plt.plot(axis(0), axis(1), 'g^', ms=5)
-
-    
-    #plt.show()
 
 def integral(speed, time0):
     out = np.zeros_like(speed)
@@ -619,9 +600,6 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
     _, hi, wi, _ = images.shape
     turn = turn[j, :, :]
 
-
-
-
     def get_color(prob):
         cm = pylab.get_cmap('viridis')  # inferno
         color = cm(prob)  # color will now be an RGBA tuple
@@ -633,7 +611,6 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
     def clamp(x):
         x = float(x)
         return max(0, min(x, 1))
-
 
     def add_to_ada(ada, pos_x, pos_y, radius, angle_s, angle_e, ring_width, color_code, edge_color, alpha_value):
         ada.drawing_area.add_artist(
@@ -684,7 +661,6 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
             draw_pile_cake(ada, pos_x=80, pos_y=70, radius=70, angle_s=0, angle_diff=360, ring_width=40,
                            color_code='#00FF00', edge_color=None, alpha_value=action_mean, share=1,
                            x_frac=0.18, y_frac=0.89, split='G', fontsize=32)
-#x_frac = 0.605
 
     _, short_name = os.path.split(name[j])
     short_name = short_name.split(".")[0]
@@ -707,17 +683,13 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
         ada = AnchoredDrawingArea(200, 100, 0, 0, loc=2, pad=0., frameon=False)
         draw_cake_type(ada, string_type, action_mean, predict_mean)
 
-
         ax.add_artist(ada)
-        #ax.axis('off')
-        #ax_2.axis('off')
         ax.set_axis_off()
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
         ax_2.set_axis_off()
         ax_2.get_xaxis().set_visible(False)
         ax_2.get_yaxis().set_visible(False)
-
 
         if not os.path.exists(os.path.join(dir_name,'viz')):
             os.mkdir(os.path.join(dir_name,'viz'))
@@ -755,7 +727,6 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
             ada.drawing_area.add_artist(
                 Wedge((pos_x, pos_y), radius, angle_s, angle_e, width=ring_width, fc=color_code  # '#DAF7A6'
                       ,ec = 'none', alpha=alpha_value, antialiased=True))
-
 
         bin_ends = 180 - np.array(bin_ends)
         bin_ends = bin_ends[::-1]
@@ -804,9 +775,6 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
         course_bin, speed_bin = car_stop_model.get_bins()
         course_bin = [-math.pi/2] + course_bin + [math.pi/2]
         course_bin = np.array(course_bin)*180/math.pi + 90
-
-        #print(course_bin,'course_bin______________')
-
         ax_original = plt.gca()
         ax_original.set_axis_off()
         ax_original.get_xaxis().set_visible(False)
@@ -816,7 +784,7 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
 
         course = softmax(predict[i:(i + 1), 0:FLAGS.discretize_n_bins])
         course = course/np.max(course)
-        #print(locs)
+
         print(course_bin, course, '!'*10)
         ada2 = plot_greens(course_bin, course, 1280, 501, 200, -locs[i, 0]*180/math.pi+90)
         ax_original.add_artist(ada2)
@@ -839,7 +807,7 @@ def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
     decoded, speed, name, isstop, turn, locs = tout
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
-    #images = images.astype('float64')
+
     _, hi, wi, _ = images.shape
     locs = locs[j, :, :]
 

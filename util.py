@@ -31,7 +31,6 @@ def _activation_summary(x, TOWER_NAME):
   # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
   # session. This helps the clarity of presentation on tensorboard.
   print(x)
-
   tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
   tf.histogram_summary(tensor_name + '/activations', x)
   tf.scalar_summary(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
@@ -68,8 +67,6 @@ def filter_no_groundtruth_label(label, prediction):
     valid = tf.greater_equal(label, 0)
     return bool_select(label, valid), bool_select(prediction, valid)
 
-
-
 def bilinearResize(images, ratiox, ratioy):
     '''
     images: 4D image batch
@@ -89,15 +86,12 @@ def bilinearResize(images, ratiox, ratioy):
     for i in range(c):
         weights[:,:,i,i] = weight
 
-
     out_shape = [b, h*ratiox, w*ratioy, c]
     strides = [1, ratiox, ratioy, 1]
     kernel = tf.constant(weights, name='bilinear_convt_weights')
 
     return tf.nn.conv2d_transpose(images, weights, 
             out_shape, strides=strides, padding='SAME')
-
-
 
 def tensors_in_checkpoint_file(file_name):
     try:

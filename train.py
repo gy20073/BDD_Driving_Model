@@ -1,19 +1,3 @@
-# Copyright 2016 Google Inc. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""A library to train CNN using multiple GPU's with synchronous updates.
-"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -84,17 +68,6 @@ tf.app.flags.DEFINE_float('clip_gradient_threshold', -1.0,
 
 
 
-# **IMPORTANT**
-# Please note that this learning rate schedule is heavily dependent on the
-# hardware architecture, batch size and any changes to the model architecture
-# specification. Selecting a finely tuned learning rate schedule is an
-# empirical process that requires some experimentation. Please see README.md
-# more guidance and discussion.
-#
-# This schedule is selected for the inception_v3 model
-# With 8 Tesla K40's and a batch size = 256, the following setup achieves
-# precision@1 = 73.5% after 100 hours and 100K steps (20 epochs).
-# Learning rate decay factor selected from http://arxiv.org/abs/1404.5997.
 tf.app.flags.DEFINE_float('initial_learning_rate', 0.1,
                           """Initial learning rate.""")
 tf.app.flags.DEFINE_float('num_epochs_per_decay', 30.0,
@@ -102,7 +75,7 @@ tf.app.flags.DEFINE_float('num_epochs_per_decay', 30.0,
 tf.app.flags.DEFINE_float('learning_rate_decay_factor', 0.16,
                           """Learning rate decay factor.""")
 
-# Yang: add a flag to switch optimizer
+# add a flag to switch optimizer
 tf.app.flags.DEFINE_string('optimizer', 'sgd',
                            '''Select which optimizer to use. Currently'''
                            '''available optimizers are sgd and rmsprop''')
@@ -114,7 +87,7 @@ RMSPROP_EPSILON = 1.0              # Epsilon term for RMSProp.
 tf.app.flags.DEFINE_float('momentum', 0.9,
                           """Momentum for SGD or RMSProp.""")
 
-# Yang: add display interval flags
+# add display interval flags
 tf.app.flags.DEFINE_integer('display_loss', 10,
                             '''display loss info per this batch''')
 tf.app.flags.DEFINE_integer('display_summary', 100,
@@ -125,11 +98,6 @@ tf.app.flags.DEFINE_integer('checkpoint_interval', 5000,
 tf.app.flags.DEFINE_boolean('temp_disable_profile', False,
                             '''disable profile''')
 
-
-# consider removing the num_classes in the argument
-# because it doesn't seem to be a necessary part for the model, but for
-# all the tasks we are doing right now (classification, detection and
-# segmentation), they are all classification tasks in the end
 def _tower_loss(inputs, outputs, num_classes, scope):
   # inputs and outputs are two lists of tensors
 
@@ -157,7 +125,6 @@ def _tower_loss(inputs, outputs, num_classes, scope):
   """
 
   # Build inference Graph.
-  # Yang: has delete the restore_logits here
   logits = model.inference(inputs, num_classes, for_training=True, scope=scope)
 
   # Build the portion of the Graph calculating the losses. Note that we will
@@ -273,9 +240,7 @@ def train():
                              FLAGS.batch_size)
     decay_steps = int(num_batches_per_epoch * FLAGS.num_epochs_per_decay)
 
-    # TODO: add reduceLRonPlateau
-    # see: https://github.com/fchollet/keras/blob/master/keras/callbacks.py#L539
-    # Decay the learning rate exponentially based on the number of steps.
+
     lr = tf.train.exponential_decay(FLAGS.initial_learning_rate,
                                     global_step-FLAGS.training_step_offset,
                                     decay_steps,
@@ -420,7 +385,7 @@ def train():
                 g_out=g
                 print(v_name, " * 1.00")
             grads_out.append((g_out, v))
-        grads=grads_out
+        grads = grads_out
 
     # gradient clipping
     if FLAGS.clip_gradient_threshold > 0:
@@ -591,7 +556,6 @@ def train():
         checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
         saver.save(sess, checkpoint_path, global_step=global_step)
         sys.exit()
-
 
 def main(_):
   print(tf)

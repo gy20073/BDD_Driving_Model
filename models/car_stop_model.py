@@ -19,12 +19,12 @@ import os
 
 # base CNNs
 from models.kaffe.caffenet import CaffeNet
-from models.kaffe.caffenet_dilation import CaffeNet_dilation
+#from models.kaffe.caffenet_dilation import CaffeNet_dilation
 from models.kaffe.caffenet_dilation8 import CaffeNet_dilation8
-from models.kaffe.caffenet_padding import CaffeNet_padding
+#from models.kaffe.caffenet_padding import CaffeNet_padding
 # too slow
-from models.kaffe.dilation10 import Dilation
-from models.kaffe.dilation10_front import Dilation_front
+#from models.kaffe.dilation10 import Dilation
+#from models.kaffe.dilation10_front import Dilation_front
 
 TOWER_NAME = 'tower'
 BATCHNORM_MOVING_AVERAGE_DECAY=0.9997
@@ -37,8 +37,8 @@ tf.app.flags.DEFINE_string('sub_arch_selection', 'car_stop',
                            """select which sub_arch to use under the arch """)
 
 
-tf.app.flags.DEFINE_string('pretrained_model_path', '/home/yang/si/data/pretrained_models/tf.caffenet.bin',
-                           """The pretrained model weights""")
+tf.app.flags.DEFINE_string('pretrained_model_path', './data/tf.caffenet.bin',
+                           """The pretrained model weights""") #TODO: MOVED TO ./data
 
 tf.app.flags.DEFINE_string('lstm_hidden_units', "256,256",
                            """define how many hidden layers and the number of hidden units in each of them""")
@@ -113,14 +113,12 @@ tf.app.flags.DEFINE_float('discretize_min_speed', 0.3,
                             '''consider the [0, +max_speed] as usual, using logbin''')
 tf.app.flags.DEFINE_float('discretize_bound_speed', 40,
                             '''consider the [0, +max_speed] as usual, using logbin''')
-
 tf.app.flags.DEFINE_float('discretize_label_gaussian_sigma', 1.0,
-                            ''' ''')
+                            '''the sigma parameter for gaussian dist''')
 tf.app.flags.DEFINE_float('discretize_min_prob', 1e-6,
                             '''min prob for each bin, avoid underflow''')
 tf.app.flags.DEFINE_string('discretize_bin_type', "log",
                             '''What kind of bins to use for discritization''')
-
 tf.app.flags.DEFINE_string('discretize_datadriven_stat_path', "",
                             '''the file path to the data driven stat''')
 
@@ -131,7 +129,6 @@ tf.app.flags.DEFINE_float('ptrain_weight', 1.0,
                           'The weight of the privilege loss')
 tf.app.flags.DEFINE_boolean('omit_action_loss', False,
                           'Omit the action loss for using the ptrain as pretraining')
-
 tf.app.flags.DEFINE_string('class_balance_path', "",
                             '''Which empirical distribution path to use, if empty then don't use''')
 tf.app.flags.DEFINE_float('class_balance_epsilon', 0.01,
@@ -141,12 +138,12 @@ tf.app.flags.DEFINE_string('temporal_net', "LSTM",
                             '''Which temporal net to use''')
 
 tf.app.flags.DEFINE_boolean('normalize_before_concat', True,
-                            '''''')
+                            '''normalization before concatenation''')
 tf.app.flags.DEFINE_string('unique_experiment_name', "",
                             '''If not empty, then use it to random init params''')
 
 tf.app.flags.DEFINE_float('dropout_LSTM_keep_prob', -1,
-                            '''''')
+                            '''dropout probability for LSTM''')
 tf.app.flags.DEFINE_boolean('pdf_normalize_bins', True,
                             '''Normalize the pdf for each bin. Disable it for visualization purpose''')
 tf.app.flags.DEFINE_string('cnn_split', 'conv4', 'where we want to split for priviledged training')
@@ -156,11 +153,10 @@ tf.app.flags.DEFINE_boolean('image_downsample', False, 'downsample to 384, 216')
 FLAGS = tf.app.flags.FLAGS
 
 def inference(net_inputs, num_classes, for_training=False, scope=None):
-    # something that you might want to tune
     #weight_decay = 0.0005 # disable weight decay and add all of them back in the end.
     weight_decay = 0.0
     FLAGS.weight_decay = weight_decay
-    bias_initialize_value=0.1
+    bias_initialize_value = 0.1
     # tunable things end here
 
     method = globals()[FLAGS.arch_selection]
@@ -225,12 +221,7 @@ def inference(net_inputs, num_classes, for_training=False, scope=None):
 def LRCN(net_inputs, num_classes, for_training):
     # network inputs are list of tensors:
     # 5D images(NFHWC), valid labels (NF*1), egomotion list (NF*previous_steps*3), this video's name (string)
-    if FLAGS.data_provider == "nexar_dataset":
-        images = net_inputs[0]
-        isvalid = net_inputs[1]
-        previousEgomotion = net_inputs[2]
-        name = net_inputs[3]
-    elif FLAGS.data_provider == "nexar_large_speed":
+    if FLAGS.data_provider == "nexar_large_speed":
         images = net_inputs[0]
         speed = net_inputs[1]
         if FLAGS.only_seg == 1:
@@ -295,19 +286,15 @@ def LRCN(net_inputs, num_classes, for_training):
         # the indices that don't wish to be normalized
         normalize_exceptions = []
         if FLAGS.use_image_feature:
-            
             if FLAGS.add_dim_reduction:
                 # a projection layer to avoid large feature dims
                 image_features = slim.conv2d(image_features, FLAGS.projection_dim, [1, 1], 1, scope="dim_reduction")
-
             if FLAGS.add_avepool_after_dim_reduction:
                 # reduce the H and W dimension
                 image_features = tf.reduce_mean(image_features, reduction_indices=[1,2])
-
             avepool_stride = FLAGS.add_avepool_after_dim_reduction_with_stride
             if FLAGS.add_avepool_after_dim_reduction_with_stride > 0:
                 image_features = slim.avg_pool2d(image_features, kernel_size=avepool_stride, stride=avepool_stride)
-
             if FLAGS.add_dropout_layer:
                 image_features = slim.dropout(image_features, keep_prob=FLAGS.keep_prob, scope="dropout_image_features")
 
@@ -322,7 +309,6 @@ def LRCN(net_inputs, num_classes, for_training):
             # now image features is: batch_size*Frames, H, W, C
             # reshape to batch * Frames * 1 * HWC
             image_features = tf.reshape(image_features, [shape[0], shape[1], -1])
-
             all_features.append(image_features)
 
         if FLAGS.use_previous_speed_feature:
@@ -348,10 +334,10 @@ def LRCN(net_inputs, num_classes, for_training):
             all_features.append(isvalid)
         
         if FLAGS.only_seg == 1 :
-            ctx_features_tmp = tf.transpose(ctx,perm = [0,1,3,4,2])
+            ctx_features_tmp = tf.transpose(ctx, perm = [0,1,3,4,2])
             all_features = [tf.reshape(ctx_features_tmp, [shape[0],shape[1], -1])]
         
-        if len(all_features)>1 and FLAGS.normalize_before_concat:
+        if len(all_features) > 1 and FLAGS.normalize_before_concat:
             for i in range(len(all_features)):
                 if not (i in normalize_exceptions):
                     all_features[i] = tf.nn.l2_normalize(all_features[i], 2)
@@ -410,8 +396,7 @@ def LRCN(net_inputs, num_classes, for_training):
 
             ################Final Classification#################
             # concatentate outputs into a single tensor, the output size is (batch*nframe, hidden[-1])
-            # This line below is a bug
-            #hidden_out = tf.concat(0, output, name='concat_rnn_outputs')
+
             hidden_out = tf.pack(output, axis=1, name='pack_rnn_outputs')
             hidden_out = tf.reshape(hidden_out, [shape[0] * shape[1], -1])
 
@@ -456,15 +441,12 @@ def LRCN(net_inputs, num_classes, for_training):
                     merged = tf.pack(cur_inp, axis=1, name='concat_before_max_pool')
                     merged_shape = [x.value for x in merged.get_shape()]
                     merged = tf.reshape(merged, [shape[0]*shape[1]]+merged_shape[2:])
-
-                    #merged = tf.concat(0, cur_inp, name="concat_before_max_pool")
                     merged = slim.max_pool2d(merged,
                                              kernel_size=pools[ilayer],
                                              stride=pools[ilayer])
                     merged_shape = [x.value for x in merged.get_shape()]
                     merged = tf.reshape(merged, shape[0:2]+merged_shape[1:])
                     cur_inp = tf.unpack(merged, axis = 1)
-
             output = cur_inp
             ################Final Classification#################
             # concatentate outputs into a single tensor, the output size is (batch*nframe, H', W', C')
@@ -474,7 +456,6 @@ def LRCN(net_inputs, num_classes, for_training):
 
             hidden_out = tf.pack(output, axis=1, name='pack_rnn_outputs')
             hidden_out = tf.reshape(hidden_out, [shape[0] * shape[1], -1])
-
         else:
             raise ValueError("temporal_net invalid: %s" % FLAGS.temporal_net)
 
@@ -506,9 +487,6 @@ def LRCN(net_inputs, num_classes, for_training):
         if FLAGS.city_data:
             logits += [city_features]
 
-        # not reshape for now, because we can deal with it as if it's a classification problem
-        # reshape the logits into proper size: batch * nframe * num_classes
-        #logits = tf.reshape(logits, [shape[0], shape[1], num_classes])
         
     return logits
     # The usage of logits from model.inference() output
@@ -527,16 +505,13 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
                 city_im_shape[3],
                 city_im_shape[4]])
 
-    #city_ims = tf.concat(0, [images, city_ims])
-
     NET = globals()[FLAGS.segmentation_network_arch]
-
     processed_images = NET.preprocess(city_ims)
 
     use_dropout = 0.0
     if FLAGS.enable_basenet_dropout and for_training:
         use_dropout = 1.0
-        print("-"*40, "enable basenet dropout")
+        print("-"*40, "enable base-net dropout")
     net=NET({"input": processed_images},
             FLAGS.pretrained_model_path,
             use_dropout=use_dropout) 
@@ -564,7 +539,7 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
                                         padding='VALID',
                                         scope='segmentation_fc8')
 
-            city_segmentation_features = city_features #city_features[shape[0] * shape[1]:, :, :, :]
+            city_segmentation_features = city_features
 
             pred = tf.argmax(city_features, 3)
             pred_shape = [x.value for x in pred.get_shape()]
@@ -600,7 +575,6 @@ def loss_car_stop(logits, net_outputs, batch_size=None):
     prediction = logits[0]      # shape: (N * F) * 2
     # filter the no ground truth data
     labels, prediction = util.filter_no_groundtruth_label(labels, prediction)
-
     labels_shape = tf.shape(labels)
     effective_batch_size = labels_shape[0]
     num_classes = prediction.get_shape()[-1].value
@@ -615,7 +589,6 @@ def loss_car_stop(logits, net_outputs, batch_size=None):
         mask = tf.gather(weights, labels)
     else:
         mask = 1.0
-
     # Cross entropy loss for the main softmax prediction.
     slim.losses.softmax_cross_entropy(prediction, dense_labels, weight = mask)
 
@@ -643,7 +616,6 @@ def loss_car_discrete(logits, net_outputs, batch_size=None):
 ##################### Loss Functions of the continous discritized #########
 # helper function
 def segmentation_color(pred):
-    
     color = {0:[128, 64, 128], 1:[244, 35,232], 2:[ 70, 70, 70],
              3:[102, 102,156], 4:[190,153,153], 5:[153,153,153],
              6:[250, 170, 30], 7:[220,220,  0], 8:[107,142, 35],
@@ -659,8 +631,6 @@ def segmentation_color(pred):
     pred = pred.reshape(shape[0],shape[1],shape[2],3)
     return pred.astype(np.uint8)
 
-
-
 def get_bins():
     name = "get_bins_%s" % FLAGS.discretize_bin_type
     return globals()[name]()
@@ -670,7 +640,6 @@ datadriven_bins_cache = None
 
 def merge_small_bins(bins, minwidth):
     bins = np.squeeze(bins)
-
     last_id = 0
     output = [bins[0]]
     for i in range(1, len(bins)):
@@ -684,8 +653,6 @@ def samples_to_bins(samples, nbins, minwidth):
     bins = np.percentile(samples, np.linspace(0, 100, nquantile))
     merged = merge_small_bins(bins, minwidth)
     len_merged = len(merged)
-    # print(len(merged))
-    # print(np.degrees(merged))
     out = np.interp(np.linspace(0, len_merged - 1, nbins), range(0, len_merged), merged)
     return out
 
@@ -781,7 +748,6 @@ def get_bins_custom():
     speed_bin = np.arange(min_s, max_s, (max_s - min_s) / (n - 1) * 0.99999)
     speed_bin = speed_bin[1:]
 
-    #print("-"*40, "using custom bins", course_bin, speed_bin)
     return list(course_bin), list(speed_bin)
 
 # convert the labels to bins
@@ -927,7 +893,6 @@ def loss_car_joint(logits, net_outputs, batch_size=None):
     future_predict = logits[0]
     slim.losses.softmax_cross_entropy(future_predict, dense_labels, weight=masks)
 
-
 def loss(logits, net_outputs, batch_size=None):
     if FLAGS.city_data:
         #city seg loss
@@ -958,15 +923,11 @@ def pdf_bins(bins, prob, query):
 
     assert(len(bins) == len(prob)+1)
     for i in range(len(prob)):
-
         if bins[i + 1] >= query >= bins[i]:
             if FLAGS.pdf_normalize_bins:
                 return prob[i] / (bins[i + 1] - bins[i])
             else:
                 return prob[i]
-    #l = np.searchsorted(bins, query)
-    #i = l - 1
-    #return prob[i] / (bins[i+1]-bins[i])
 
 def pdf_bins_batch(bins, prob, querys):
     assert (len(bins) == len(prob) + 1)
@@ -986,8 +947,6 @@ def pdf_bins_batch(bins, prob, querys):
         else:
             out[i] = prob[start]
     return out
-
-
 
 def continous_pdf_car_loc_xy(logits, labels):
     # the first entry is the predicted logits

@@ -149,7 +149,7 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     if num_preprocess_threads is None:
       num_preprocess_threads = FLAGS.num_preprocess_threads
 
-    # Yang: to reduce the num of preprocessing threads, no longer require this
+    # to reduce the num of preprocessing threads, no longer require this
     #if num_preprocess_threads % 4:
     #  raise ValueError('Please make num_preprocess_threads a multiple '
     #                   'of 4 (%d % 4 != 0).', num_preprocess_threads)

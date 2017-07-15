@@ -189,8 +189,8 @@ class MyDataset(Dataset):
         if FLAGS.fast_jpeg_decode == "pyfunc":
             print("using ctypes jpeg decode...")
             lib_jpeg = ctypes.cdll.LoadLibrary('./data_providers/decode_jpeg_memory/decode_memory.so')
-            global yang_jpeg
-            yang_jpeg = lib_jpeg.decode_jpeg_memory_turbo
+            global ctypes_jpeg
+            ctypes_jpeg = lib_jpeg.decode_jpeg_memory_turbo
             return self.decode_jpeg_python(image_buffer, scope)
         elif FLAGS.fast_jpeg_decode=="tf":
             print("using tensorflow binary libjpeg turbo")
@@ -274,7 +274,6 @@ class MyDataset(Dataset):
             file_bytes = np.asarray(bytearray(st), dtype=np.uint8)
             t = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             ans[i, :, :, :] = t
-
         ans = ans[:, :, :, [2, 1, 0]]
         return ans
 
@@ -292,7 +291,7 @@ class MyDataset(Dataset):
             p1 = ctypes.c_void_p(file_bytes.ctypes.data)
             p2 = ctypes.c_int(len(file_bytes))
             p6 = ctypes.c_int(H * W * C * i)
-            yang_jpeg(p1, p2, p3, p4, p5, p6)
+            ctypes_jpeg(p1, p2, p3, p4, p5, p6)
 
         return ans
 
@@ -303,15 +302,13 @@ class MyDataset(Dataset):
             cW = FLAGS.IM_WIDTH // FLAGS.decode_downsample_factor
             cC = 3
             cDown = FLAGS.decode_downsample_factor
-
             decoded = tf.py_func(self.decode_batch_libturbo, [image_buffer, cH, cW, cC, cDown], [tf.uint8])[0]
             decoded.set_shape([cN, cH, cW, cC])
-
             return decoded
 
     @staticmethod
     def future_smooth(actions, naction, nfuture):
-        # TODO: could add weighting diff between near future and far future
+        # TODO: could add weighting differently between near future and far future
         # given a list of actions, for each time step, return the distribution of future actions
         l = len(actions) # action is a list of integers, from 0 to naction-1, negative values are ignored
         out = np.zeros((l, naction), dtype=np.float32)
@@ -398,12 +395,12 @@ class MyDataset(Dataset):
                   'turn_left': 2, 'turn_right': 3,
                   'turn_left_slight': 4, 'turn_right_slight': 5,}
                   #'acceleration': 6, 'deceleration': 7}
+
     turn_int2str={y: x for x, y in turn_str2int.iteritems()}
     naction = np.sum(np.less_equal(0, np.array(turn_str2int.values())))
 
     @staticmethod
     def turning_heuristics(speed_list, speed_limit_as_stop=0):
-        # TODO(lowres)
         course_list = MyDataset.to_course_list(speed_list)
         speed_v = np.linalg.norm(speed_list, axis=1)
         l = len(course_list)
@@ -444,6 +441,7 @@ class MyDataset(Dataset):
                 action[i] = enum['slow_or_stop']
                 course_diff[i] = 9999
                 continue
+
             course_diff[i] = diff(course, prev)*360/(2*math.pi)
             if thresh_high > diff(course, prev) > thresh_low:
                 if diff(course, prev) > thresh_slight_low:
@@ -477,8 +475,6 @@ class MyDataset(Dataset):
 
         # avoid the initial uncertainty
         action[0] = action[1]
-
-        if 0: print("course diff: ", course_diff)
         return action
 
     @staticmethod
@@ -603,11 +599,7 @@ class MyDataset(Dataset):
 
         type_code = np.asscalar(np.fromstring(array[0:4], dtype=np.int32))
         shape_size = np.asscalar(np.fromstring(array[4:8], dtype=np.int32))
-        #print(type_code)
-        #print(shape_size)
-        #for i in range(10):
-        #    print(ord(array[i]))
-        #print(shape_size, '____________________________________________')
+
         shape = np.fromstring(array[8: 8+4 * shape_size], dtype=np.int32)
         if type_code == 5:#cv2.CV_32F:
             dtype = np.float32
@@ -618,8 +610,6 @@ class MyDataset(Dataset):
     
     def read_array(self, array_buffer):
         fn = lambda array: MyDataset.parse_array(array)
-        #print(array_buffer)
-        #print(array_buffer.get_shape)
         ctx_decoded = map(fn, array_buffer)                       
         return [ctx_decoded]
 
@@ -793,14 +783,11 @@ class MyDataset(Dataset):
                                      [FLAGS.city_batch, city_frames, new_size[0], new_size[1], city_im_channel])
                 city_seg = tf.reshape(city_seg, [FLAGS.city_batch, city_frames, new_size[0], new_size[1],
                                                  city_seg_channel])
-
             ins += [city_im]
             outs += [city_seg]
         if FLAGS.only_seg == 1:
             ins = ins + batched[5:7]
             outs = outs
-
-
         # dropout non-stop videos
         if FLAGS.balance_drop_prob > 0:
             retained = tf.py_func(self.no_stop_dropout_valid,
@@ -811,8 +798,6 @@ class MyDataset(Dataset):
             select = lambda tensors, valid: [util.bool_select(x, valid) for x in tensors]
             ins = select(ins, retained)
             outs = select(outs, retained)
-
-        
         return ins, outs
 
     def batching(self, tensor, FRAMES_IN_SEG):
