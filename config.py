@@ -8,6 +8,12 @@ sys.path.append('../')
 import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 
+def set_gpu_ids(phase, train, eval_or_test):
+    if phase == "train":
+        set_gpu(train)
+    elif phase == "eval" or phase == "test":
+        set_gpu(eval_or_test)
+
 def camera2_speed_only(phase):
     # record the experiment on excel
     # make dir and copy the initial model from car_discrete_cnn_224_224
@@ -16,15 +22,9 @@ def camera2_speed_only(phase):
     # open the browser for tensorboard
 
     tag = inspect.stack()[0][3]
+    set_gpu_ids(phase, "1", "1")
     if phase == "train":
-        set_gpu("1")
         FLAGS.batch_size = 10
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("1")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
 
     common_final_settings(phase,
                           tag,
@@ -47,15 +47,7 @@ def camera_tcnn1_no_batch_norm(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test camera_tcnn1_no_batch_norm
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("2")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("5")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "2", "5")
     common_final_settings(phase,
                           tag,
                           7271)
@@ -77,15 +69,7 @@ def camera2_tcnn3(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_tcnn3
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("0")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("7")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "0", "7")
     common_final_settings(phase,
                           tag,
                           7294)
@@ -107,15 +91,7 @@ def camera2_tcnn9(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_tcnn9
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("0")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("0")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "0", "0")
     common_final_settings(phase,
                           tag,
                           7275)
@@ -137,15 +113,7 @@ def camera_cnn_lstm_no_batch_norm(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test camera_cnn_lstm_no_batch_norm
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("3")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("1")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "3", "1")
     common_final_settings(phase,
                           tag,
                           7273)
@@ -163,15 +131,7 @@ def camera2_cnn_speed(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_cnn_speed
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("1")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("1")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "1", "1")
     common_final_settings(phase,
                           tag,
                           7278)
@@ -193,15 +153,7 @@ def camera2_fcn_lstm(phase):
     # open the browser for tensorboard
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("2")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("6")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        set_gpu("0")
-
+    set_gpu_ids(phase, "2", "6")
     common_final_settings(phase,
                           tag,
                           7277,
@@ -223,15 +175,7 @@ def camera_continous_linear(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py eval camera_continous_linear
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("0")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("7")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        pass
-
+    set_gpu_ids(phase, "0", "7")
     common_final_settings_continous(phase,
                                     tag,
                                     7260,
@@ -260,15 +204,7 @@ def camera3_continous_log(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py train camera3_continous_log
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("1")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("6")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        pass
-
+    set_gpu_ids(phase, "1", "6")
     common_final_settings_continous(phase,
                                     tag,
                                     7297)
@@ -294,15 +230,7 @@ def camera3_continous_datadriven(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py board camera3_continous_datadriven
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("2")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("5")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        pass
-
+    set_gpu_ids(phase, "2", "5")
     common_final_settings_continous(phase,
                                     tag,
                                     7298)
@@ -329,15 +257,7 @@ def ptrain_1000_FCN(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py test ptrain_1000_FCN
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("0")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("7")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        pass
-
+    set_gpu_ids(phase, "0", "7")
     common_final_settings(phase,
                           tag,
                           7286,
@@ -364,15 +284,7 @@ def ptrain_1000_baseline_FCN(phase):
     # cd /data/yang/si/ && python scripts/train_car_stop.py train ptrain_1000_baseline_FCN
 
     tag = inspect.stack()[0][3]
-    if phase == "train":
-        set_gpu("0")
-    elif phase == "eval" or phase == "test":  # TODO finish support for testing
-        set_gpu("6")
-    elif phase == "stat":
-        pass
-    elif phase == "board":
-        pass
-
+    set_gpu_ids(phase, "0", "6")
     common_final_settings(phase,
                           tag,
                           7287,
@@ -503,7 +415,7 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
         FLAGS.no_image_input = True
         FLAGS.subsample_factor = 10
     elif phase == "board":
-        pass
+        set_gpu("0")
     elif phase == "test":
         FLAGS.subset="test"
         # TODO: polish to make it correct
