@@ -21,10 +21,6 @@ import os
 from models.kaffe.caffenet import CaffeNet
 #from models.kaffe.caffenet_dilation import CaffeNet_dilation
 from models.kaffe.caffenet_dilation8 import CaffeNet_dilation8
-#from models.kaffe.caffenet_padding import CaffeNet_padding
-# too slow
-#from models.kaffe.dilation10 import Dilation
-#from models.kaffe.dilation10_front import Dilation_front
 
 TOWER_NAME = 'tower'
 BATCHNORM_MOVING_AVERAGE_DECAY=0.9997
@@ -38,7 +34,7 @@ tf.app.flags.DEFINE_string('sub_arch_selection', 'car_stop',
 
 
 tf.app.flags.DEFINE_string('pretrained_model_path', './data/tf.caffenet.bin',
-                           """The pretrained model weights""") #TODO: MOVED TO ./data
+                           """The pretrained model weights""") #TODO: MOVED TO ./data, and release the pretrained model
 
 tf.app.flags.DEFINE_string('lstm_hidden_units', "256,256",
                            """define how many hidden layers and the number of hidden units in each of them""")

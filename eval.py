@@ -142,6 +142,24 @@ def _eval_once(saver, summary_writer, logits_all, labels, loss_op, summary_op, t
       for qr in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
         threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
                                          start=True))
+
+      eval_method = globals()[FLAGS.eval_method]
+      summary = eval_method(logits_all, labels, loss_op, sess, coord, summary_op, tensors_in, summary_writer)
+      summary_writer.add_summary(summary, global_step)
+
+      previous_evaluated_model = ckpt_path
+      # Have finished the evaluation of this round
+      global should_save
+      if should_save and FLAGS.save_best_model:
+        # delete the previous saved best model
+        for f in os.listdir(FLAGS.checkpoint_dir):
+          if f.endswith(".bestmodel"):
+            os.remove(os.path.join(FLAGS.checkpoint_dir, f))
+        # save for the current round
+        copyfile(ckpt_path, ckpt_path + ".bestmodel")
+        should_save = False
+        print("saving model finished, you could interrupt now")
+
     except Exception as e:  # pylint: disable=broad-except
       coord.request_stop(e)
 

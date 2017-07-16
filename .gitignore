@@ -1,0 +1,11 @@
+.idea
+.ipynb_checkpoints
+data
+convnet-benchmarks-master/
+models-master/
+*.pyc
+*.npy
+*.swp
+scratch.ipynb
+*DS_Store*
+data_providers/near_dataset_sanity_check_harry.ipynb

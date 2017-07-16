@@ -5,8 +5,6 @@ from __future__ import print_function
 import tensorflow as tf
 import util
 import math
-# backward compatibility, in the future, the augmentation should be in data_provider
-from augment_cls import *
 
 FLAGS = tf.app.flags.FLAGS
 # TODO: current support of detection and segmentation are preliminary
@@ -265,64 +263,4 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
         return joined_inputs, joined_outputs
 
     else:
-        # TODO: data provider that is not compatible with MIMO will be deprecated in the future
-        # to convert the old data providers, you need to :
-        # 1. do data augmentation in the provider
-        # 2. return tensors with "batch" dimension
-        # 3. write a visualilzer
-
-        images_and_labels = []
-        for thread_id in range(num_preprocess_threads):
-          # Parse a serialized Example proto to extract the image and metadata.
-
-          # this function returns the
-          # (image, classification label, bounding box label, seg mask, extra info)
-          image_raw, label, bbox, mask, extra_info = dataset.parse_example_proto(
-              example_serialized)
-          image = image_preprocessing(image_raw, bbox, train, thread_id)
-          images_and_labels.append([image, label, mask])
-
-        joins = []
-        for i in range(FLAGS.num_batch_join):
-            reduced_factor = math.ceil(num_preprocess_threads / FLAGS.num_batch_join)
-            one_joined=tf.train.batch_join(tensors_list=images_and_labels,
-                                            batch_size=batch_size,
-                                            capacity= reduced_factor * batch_size)
-            joins.append(one_joined)
-        print(FLAGS.num_batch_join, " batch_joins, each of them capacity is, ",
-              reduced_factor*batch_size, " instances")
-            
-        # add a buffering queue to remove the dequeue_many time
-        print("buffer queue capacity is: ", FLAGS.num_batch_join, " batches")
-        capacity = FLAGS.num_batch_join
-        buffer_queue = tf.FIFOQueue(
-            capacity= capacity,
-            dtypes=[x.dtype for x in one_joined],
-            shapes = [x.get_shape() for x in one_joined],
-            name = "buffer_queue")
-        tf.scalar_summary("queue/%s/fraction_of_%d_full" % (buffer_queue.name, capacity),
-                       tf.cast(buffer_queue.size(), tf.float32) *
-                       (1. / capacity))
-        buffer_ops = [buffer_queue.enqueue(join) for join in joins]
-        tf.train.queue_runner.add_queue_runner(
-            tf.train.queue_runner.QueueRunner(buffer_queue, buffer_ops))
-        images, labels, masks = buffer_queue.dequeue()
-        
-        
-        
-        # TODO: have a background process to dequeue and copy to GPU
-
-        # TODO: different height and width should be fixed in general
-        height = FLAGS.image_size
-        width = FLAGS.image_size
-
-        depth = 3
-
-        # TODO: make sure the Tensor's type and shape is correctly done in parse_example_proto
-        images = tf.cast(images, tf.float32)
-        images = tf.reshape(images, shape=[batch_size, height, width, depth])
-
-        # Display the training images in the visualizer.
-        tf.image_summary('images', images)
-
-        return [images], [tf.reshape(labels, [batch_size])]
+        raise ValueError("have to use MIMO input pipeline")
