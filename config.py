@@ -8,7 +8,18 @@ sys.path.append('../')
 import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 
-def camera2_speed_only(phase):
+############################Set those path before use###################################
+FLAGS.pretrained_model_path = "/data/yang/si/data/pretrained_models/tf.caffenet.bin"
+FLAGS.data_dir = "/data/yang/data/tfrecord_20170329"
+
+# for privilege training: segmentation image index and labels
+train_city_image_list = '/backup/BDDNexar/Harry_config/Color_train_harry.txt'
+train_city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_train_harry.txt'
+eval_city_image_list = '/backup/BDDNexar/Harry_config/Color_val_harry.txt'
+eval_city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_val_harry.txt'
+
+############################discrete action###################################
+def discrete_speed_only(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "1")
     if phase == "train":
@@ -29,7 +40,7 @@ def camera2_speed_only(phase):
     FLAGS.num_batch_join = 1
     FLAGS.num_preprocess_threads = 1
 
-def camera_tcnn1_no_batch_norm(phase):
+def discrete_tcnn1(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "5")
     common_final_settings(phase,
@@ -42,7 +53,7 @@ def camera_tcnn1_no_batch_norm(phase):
     FLAGS.history_window = 1
     FLAGS.cnn_fc_hidden_units = 64
 
-def camera2_tcnn3(phase):
+def discrete_tcnn3(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "7")
     common_final_settings(phase,
@@ -55,7 +66,7 @@ def camera2_tcnn3(phase):
     FLAGS.history_window = 3
     FLAGS.cnn_fc_hidden_units = 64
 
-def camera2_tcnn9(phase):
+def discrete_tcnn9(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "0")
     common_final_settings(phase,
@@ -68,7 +79,7 @@ def camera2_tcnn9(phase):
     FLAGS.history_window = 9
     FLAGS.cnn_fc_hidden_units = 64
 
-def camera_cnn_lstm_no_batch_norm(phase):
+def discrete_cnn_lstm(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "3", "1")
     common_final_settings(phase,
@@ -76,7 +87,7 @@ def camera_cnn_lstm_no_batch_norm(phase):
                           7273)
     set_train_stage(False, 19433)
 
-def camera2_cnn_speed(phase):
+def discrete_cnn_lstm_speed(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "1")
     common_final_settings(phase,
@@ -86,7 +97,7 @@ def camera2_cnn_speed(phase):
 
     FLAGS.use_previous_speed_feature = True
 
-def camera2_fcn_lstm(phase):
+def discrete_fcn_lstm(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "6")
     common_final_settings(phase,
@@ -96,24 +107,24 @@ def camera2_fcn_lstm(phase):
     set_train_stage(False, 34000)
 
 
-############################experiment for continous case###################################
-def camera_continous_linear(phase):
+############################continuous action###################################
+def continuous_linear_bin(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "7")
     common_final_settings_continous(phase,
                                     tag,
-                                    7260,
-                                    basenet = "32s",
-                                    visEval = False)
+                                    7260)
     set_train_stage(False, 0)
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_max_speed = 30 * 0.99
-    FLAGS.discretize_bin_type = "linear"
-    FLAGS.discretize_n_bins = 180
     FLAGS.discretize_label_gaussian_sigma = 0.5
 
-def camera3_continous_log(phase):
+    FLAGS.discretize_bin_type = "linear"
+    FLAGS.discretize_n_bins = 180
+
+
+def continuous_log_bin(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "6")
     common_final_settings_continous(phase,
@@ -123,14 +134,15 @@ def camera3_continous_log(phase):
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_min_angle = 0.1 / 180 * math.pi
-
     FLAGS.discretize_max_speed = 30 * 0.99
     FLAGS.discretize_min_speed = 0.1
-    FLAGS.discretize_bin_type = "log"
-    FLAGS.discretize_n_bins = 179
     FLAGS.discretize_label_gaussian_sigma = 0.5
 
-def camera3_continous_datadriven(phase):
+    FLAGS.discretize_bin_type = "log"
+    FLAGS.discretize_n_bins = 179
+
+
+def continuous_datadriven_bin(phase):
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "5")
     common_final_settings_continous(phase,
@@ -138,12 +150,11 @@ def camera3_continous_datadriven(phase):
                                     7298)
     set_train_stage(False, 0)
 
-    # TODO: change linear to datadriven, implement datadriven method
+    FLAGS.discretize_max_speed = 30 * 0.99
+    FLAGS.discretize_label_gaussian_sigma = 0.5
+
     FLAGS.discretize_bin_type = "datadriven"
     FLAGS.discretize_n_bins = 181
-    FLAGS.discretize_label_gaussian_sigma = 0.5
-    FLAGS.discretize_max_speed = 30 * 0.99
-
     FLAGS.discretize_datadriven_stat_path = "data/" + tag + "/empirical_dist_dataDriven.npy"
 
 
@@ -179,7 +190,7 @@ def ptrain_1000_baseline_FCN(phase):
 
 
 ######################################################################################
-############### Common setting for camera ready ##########################
+############### shared settings ##########################
 ######################################################################################
 def set_gpu(gpus):
     os.environ['CUDA_VISIBLE_DEVICES'] = gpus
@@ -202,10 +213,8 @@ def set_train_stage(isFirstStage, offset):
 
 # discrete
 def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain=False):
-    # TODO: check the order of the flags
     # resource related
     FLAGS.unique_experiment_name = tag
-    FLAGS.pretrained_model_path = "/data/yang/si/data/pretrained_models/tf.caffenet.bin"
     FLAGS.train_dir = "data/" + tag
     FLAGS.tensorboard_port = port
 
@@ -236,7 +245,7 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
     FLAGS.release_batch = True
     FLAGS.resize_images = "228,228"
     FLAGS.balance_drop_prob = -1.0
-    FLAGS.data_dir = "/data/yang/data/tfrecord_20170329"
+
     FLAGS.decode_downsample_factor = 1
     FLAGS.temporal_downsample_factor = 5
     FLAGS.data_provider = "nexar_large_speed"
@@ -260,13 +269,12 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
         FLAGS.city_data = 1
         FLAGS.segmentation_network_arch = "CaffeNet_dilation8"
         FLAGS.early_split = False
-        # TODO: hardcode
         if phase == "train":
-            FLAGS.city_image_list = '/backup/BDDNexar/Harry_config/Color_train_harry.txt'
-            FLAGS.city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_train_harry.txt'
+            FLAGS.city_image_list = train_city_image_list
+            FLAGS.city_label_list = train_city_label_list
         elif phase == "eval":
-            FLAGS.city_image_list = '/backup/BDDNexar/Harry_config/Color_val_harry.txt'
-            FLAGS.city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_val_harry.txt'
+            FLAGS.city_image_list = eval_city_image_list
+            FLAGS.city_label_list = eval_city_label_list
 
     if phase == "train":
         # ensure that the data provider is not the bottleneck
@@ -304,7 +312,6 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
         set_gpu("0")
     elif phase == "test":
         FLAGS.subset="test"
-        # TODO: polish to make it correct
         FLAGS.eval_method = "car_discrete"
         FLAGS.run_once = True
         FLAGS.city_data = 0
