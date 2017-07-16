@@ -19,6 +19,7 @@ data setup:
     run the data prepare command
    
 run
-    cd .. & python config.py train/eval/test/board/stat config_name
-
+    cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_speed_only
+    tensorboard: do the port forwarding, open the browser for tensorboard
+    
 ack google codebase

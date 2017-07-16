@@ -8,19 +8,7 @@ sys.path.append('../')
 import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 
-def set_gpu_ids(phase, train, eval_or_test):
-    if phase == "train":
-        set_gpu(train)
-    elif phase == "eval" or phase == "test":
-        set_gpu(eval_or_test)
-
 def camera2_speed_only(phase):
-    # record the experiment on excel
-    # make dir and copy the initial model from car_discrete_cnn_224_224
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_speed_only
-    # ssh -N -L 7279:localhost:7279 leviathan.ist.berkeley.edu &
-    # open the browser for tensorboard
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "1")
     if phase == "train":
@@ -32,7 +20,6 @@ def camera2_speed_only(phase):
 
     FLAGS.num_epochs_per_decay = 8
 
-    FLAGS.training_step_offset = 0
     FLAGS.train_stage_name = "stage_all"
 
     FLAGS.use_previous_speed_feature = True
@@ -43,21 +30,12 @@ def camera2_speed_only(phase):
     FLAGS.num_preprocess_threads = 1
 
 def camera_tcnn1_no_batch_norm(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera_tcnn1_no_batch_norm
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "5")
     common_final_settings(phase,
                           tag,
                           7271)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 24732
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 24732)
 
     # specific setting
     FLAGS.arch_selection = "CNN_FC"
@@ -65,21 +43,12 @@ def camera_tcnn1_no_batch_norm(phase):
     FLAGS.cnn_fc_hidden_units = 64
 
 def camera2_tcnn3(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_tcnn3
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "7")
     common_final_settings(phase,
                           tag,
                           7294)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 21000
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 21000)
 
     # specific setting
     FLAGS.arch_selection = "CNN_FC"
@@ -87,21 +56,12 @@ def camera2_tcnn3(phase):
     FLAGS.cnn_fc_hidden_units = 64
 
 def camera2_tcnn9(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_tcnn9
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "0")
     common_final_settings(phase,
                           tag,
                           7275)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 103850
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 103850)
 
     # specific setting
     FLAGS.arch_selection = "CNN_FC"
@@ -109,71 +69,35 @@ def camera2_tcnn9(phase):
     FLAGS.cnn_fc_hidden_units = 64
 
 def camera_cnn_lstm_no_batch_norm(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera_cnn_lstm_no_batch_norm
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "3", "1")
     common_final_settings(phase,
                           tag,
                           7273)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 19433
-        FLAGS.train_stage_name = "stage_all"
-
+    set_train_stage(False, 19433)
 
 def camera2_cnn_speed(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_cnn_speed
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "1")
     common_final_settings(phase,
                           tag,
                           7278)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 82675
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 82675)
 
     FLAGS.use_previous_speed_feature = True
 
 def camera2_fcn_lstm(phase):
-    # record the experiment on excel
-    # make dir and copy the initial model from car_discrete_cnn_224_224
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test camera2_fcn_lstm
-    # ssh -N -L 7277:localhost:7277 leviathan.ist.berkeley.edu &
-    # open the browser for tensorboard
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "6")
     common_final_settings(phase,
                           tag,
                           7277,
                           basenet="8s")
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 34000
-        FLAGS.train_stage_name = "stage_all"
-
-
+    set_train_stage(False, 34000)
 
 
 ############################experiment for continous case###################################
 def camera_continous_linear(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py eval camera_continous_linear
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "7")
     common_final_settings_continous(phase,
@@ -181,13 +105,7 @@ def camera_continous_linear(phase):
                                     7260,
                                     basenet = "32s",
                                     visEval = False)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 0)
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_max_speed = 30 * 0.99
@@ -195,26 +113,13 @@ def camera_continous_linear(phase):
     FLAGS.discretize_n_bins = 180
     FLAGS.discretize_label_gaussian_sigma = 0.5
 
-    # change back from v3 to v2
-    #FLAGS.class_balance_epsilon = 0.5
-    #FLAGS.class_balance_path = "data/" + tag + "/empirical_dist"
-
 def camera3_continous_log(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py train camera3_continous_log
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "1", "6")
     common_final_settings_continous(phase,
                                     tag,
                                     7297)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 20000
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 20000)
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_min_angle = 0.1 / 180 * math.pi
@@ -226,21 +131,12 @@ def camera3_continous_log(phase):
     FLAGS.discretize_label_gaussian_sigma = 0.5
 
 def camera3_continous_datadriven(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py board camera3_continous_datadriven
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "2", "5")
     common_final_settings_continous(phase,
                                     tag,
                                     7298)
-
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 0)
 
     # TODO: change linear to datadriven, implement datadriven method
     FLAGS.discretize_bin_type = "datadriven"
@@ -253,9 +149,6 @@ def camera3_continous_datadriven(phase):
 
 ####################### priviledge training  #######################
 def ptrain_1000_FCN(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py test ptrain_1000_FCN
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "7")
     common_final_settings(phase,
@@ -266,23 +159,11 @@ def ptrain_1000_FCN(phase):
                           ptrain=True)
 
     FLAGS.num_epochs_per_decay = 20
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 8500
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 8500)
 
     FLAGS.retain_first_k_training_example = 1000
 
-    if phase == "test":
-        FLAGS.pretrained_model_checkpoint_path = "data/" + tag + "/model.ckpt-14001.bak"
-        # unbias test loss=0.977777, accuracy=70.7986, valid accuracy=70.08-69.81, diff=0.8
-
 def ptrain_1000_baseline_FCN(phase):
-    # record the experiment on excel
-    # cd /data/yang/si/ && python scripts/train_car_stop.py train ptrain_1000_baseline_FCN
-
     tag = inspect.stack()[0][3]
     set_gpu_ids(phase, "0", "6")
     common_final_settings(phase,
@@ -291,18 +172,9 @@ def ptrain_1000_baseline_FCN(phase):
                           basenet="8s")
 
     FLAGS.num_epochs_per_decay = 20
-    if False:
-        FLAGS.training_step_offset = 0
-        FLAGS.train_stage_name = "stage_lstm"
-    else:
-        FLAGS.training_step_offset = 12000
-        FLAGS.train_stage_name = "stage_all"
+    set_train_stage(False, 12000)
 
     FLAGS.retain_first_k_training_example = 1000
-
-    if phase == "test":
-        FLAGS.pretrained_model_checkpoint_path = "data/" + tag + "/model.ckpt-18001.bak"
-
 
 
 
@@ -313,6 +185,20 @@ def set_gpu(gpus):
     os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     num_gpus = len(gpus.split(","))
     FLAGS.num_gpus = num_gpus
+
+def set_gpu_ids(phase, train, eval_or_test):
+    if phase == "train":
+        set_gpu(train)
+    elif phase == "eval" or phase == "test":
+        set_gpu(eval_or_test)
+
+def set_train_stage(isFirstStage, offset):
+    if isFirstStage:
+        FLAGS.training_step_offset = 0
+        FLAGS.train_stage_name = "stage_lstm"
+    else:
+        FLAGS.training_step_offset = offset
+        FLAGS.train_stage_name = "stage_all"
 
 # discrete
 def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain=False):
