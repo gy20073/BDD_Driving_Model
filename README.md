@@ -15,6 +15,10 @@ Python packages:
     sklearn
 
 data setup:
-
+    download from somewhere
+    run the data prepare command
+   
+run
+    cd .. & python config.py train/eval/test/board/stat config_name
 
 ack google codebase

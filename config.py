@@ -29,7 +29,6 @@ def camera2_speed_only(phase):
     common_final_settings(phase,
                           tag,
                           7279)
-    common_v2()
 
     FLAGS.num_epochs_per_decay = 8
 
@@ -60,9 +59,7 @@ def camera_tcnn1_no_batch_norm(phase):
     common_final_settings(phase,
                           tag,
                           7271)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -92,9 +89,7 @@ def camera2_tcnn3(phase):
     common_final_settings(phase,
                           tag,
                           7294)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -124,9 +119,7 @@ def camera2_tcnn9(phase):
     common_final_settings(phase,
                           tag,
                           7275)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -156,9 +149,7 @@ def camera_cnn_lstm_no_batch_norm(phase):
     common_final_settings(phase,
                           tag,
                           7273)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -184,9 +175,7 @@ def camera2_cnn_speed(phase):
     common_final_settings(phase,
                           tag,
                           7278)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -217,9 +206,7 @@ def camera2_fcn_lstm(phase):
                           tag,
                           7277,
                           basenet="8s")
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -250,9 +237,7 @@ def camera_continous_linear(phase):
                                     7260,
                                     basenet = "32s",
                                     visEval = False)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -287,9 +272,7 @@ def camera3_continous_log(phase):
     common_final_settings_continous(phase,
                                     tag,
                                     7297)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -323,9 +306,7 @@ def camera3_continous_datadriven(phase):
     common_final_settings_continous(phase,
                                     tag,
                                     7298)
-    common_v2()
 
-    FLAGS.num_epochs_per_decay = 4
     if False:
         FLAGS.training_step_offset = 0
         FLAGS.train_stage_name = "stage_lstm"
@@ -363,7 +344,6 @@ def ptrain_1000_FCN(phase):
                           basenet="8s",
                           visEval=False,
                           ptrain=True)
-    common_v2()
 
     FLAGS.num_epochs_per_decay = 20
     if False:
@@ -397,7 +377,6 @@ def ptrain_1000_baseline_FCN(phase):
                           tag,
                           7287,
                           basenet="8s")
-    common_v2()
 
     FLAGS.num_epochs_per_decay = 20
     if False:
@@ -423,93 +402,53 @@ def set_gpu(gpus):
     num_gpus = len(gpus.split(","))
     FLAGS.num_gpus = num_gpus
 
-def common_discrete_settings(phase, tag, isFCN, visEval):
-    if phase == "train":
-        FLAGS.n_sub_frame = 45 if isFCN else 108
-    elif phase == "eval":
-        FLAGS.balance_drop_prob = -1.0
-
-        FLAGS.n_sub_frame = 108
-
-        FLAGS.eval_method = "car_discrete"
-
-        if visEval:
-            FLAGS.output_visualizations = True
-            FLAGS.subsample_factor = 10
-
-            FLAGS.run_once = True
-        else:
-            FLAGS.output_visualizations = False
-            FLAGS.eval_interval_secs = 1
-            FLAGS.run_once = False
-    elif phase == "stat":
-        set_gpu("0")
-        FLAGS.subset = "train"
-        FLAGS.n_sub_frame = 108
-
-        FLAGS.stat_output_path = "data/" + tag + "/empirical_dist"
-        FLAGS.eval_method = "stat_labels"
-        FLAGS.no_image_input = True
-        FLAGS.subsample_factor = 10
-
-    if not (phase == "board" or phase == "stat"):
-        FLAGS.batch_size = 1 * FLAGS.num_gpus
-
-    # the parameter setting for this experiment
-    FLAGS.sub_arch_selection = "car_discrete"
-    FLAGS.lstm_hidden_units = "64"
-    # dim reduction
-
-    FLAGS.add_dim_reduction = True
-    FLAGS.projection_dim = 64
-    FLAGS.add_dropout_layer = False
-
-    FLAGS.decode_downsample_factor = 1
-    FLAGS.temporal_downsample_factor = 5
-
-    FLAGS.data_provider = "nexar_large_speed"
-    # some tunable ground truth maker
-    FLAGS.speed_limit_as_stop = 2.0  # TODO: make sure it make sense
-    FLAGS.stop_future_frames = 1  # make sure this make sense
-    FLAGS.deceleration_thres = 1
-    FLAGS.no_slight_turn = True
-
-    # change to dilation
-    FLAGS.image_network_arch = "CaffeNet_dilation" if isFCN else "CaffeNet"
-    FLAGS.pretrained_model_path = "/data/yang/si/data/pretrained_models/tf.caffenet.bin"
-    FLAGS.cnn_feature = "fc7"
-
-    # learning rates
-    FLAGS.num_epochs_per_decay = 4 if isFCN else 2
-    FLAGS.initial_learning_rate = 1e-4
-    FLAGS.learning_rate_decay_factor = 0.5
-
-    FLAGS.train_stage_name = 'stage_all'
-
-    FLAGS.clip_gradient_threshold = 10.0
-    FLAGS.momentum = 0.99
-
 # discrete
 def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain=False):
-    # tunable config setting, that are not covered by common_discrete_setting
-    FLAGS.arch_selection = "LRCN"
-    FLAGS.ego_previous_nstep = 30
-    FLAGS.max_steps = 10000000
-
-    # id_config
+    # TODO: check the order of the flags
+    # resource related
+    FLAGS.unique_experiment_name = tag
+    FLAGS.pretrained_model_path = "/data/yang/si/data/pretrained_models/tf.caffenet.bin"
     FLAGS.train_dir = "data/" + tag
     FLAGS.tensorboard_port = port
 
-    # since we use 228*228, no need to truncate video
-    common_discrete_settings(phase, tag, False, visEval)
+    # optimization related
+    FLAGS.max_steps = 10000000
+    FLAGS.train_stage_name = 'stage_all'
+    FLAGS.clip_gradient_threshold = 10.0
+    FLAGS.momentum = 0.99
+    FLAGS.num_epochs_per_decay = 4
+    FLAGS.initial_learning_rate = 1e-4
+    FLAGS.learning_rate_decay_factor = 0.5
+
+    # NN architecture related
+    FLAGS.arch_selection = "LRCN"
+    FLAGS.sub_arch_selection = "car_discrete"
+    FLAGS.lstm_hidden_units = "64"
+    FLAGS.add_dropout_layer = False
+    FLAGS.cnn_feature = "drop7"
+    FLAGS.no_batch_norm = True
+    FLAGS.weight_decay_exclude_bias = False
+    FLAGS.enable_basenet_dropout = True
+    FLAGS.add_dim_reduction = False
+    FLAGS.add_avepool_after_dim_reduction = True
+
+    # data related
+    FLAGS.ego_previous_nstep = 30
     FLAGS.n_sub_frame = 108
-    FLAGS.sleep_per_iteration = 1.0 / 3.0
-
-
-    # disable balance drop since it has no effect
+    FLAGS.release_batch = True
+    FLAGS.resize_images = "228,228"
     FLAGS.balance_drop_prob = -1.0
     FLAGS.data_dir = "/data/yang/data/tfrecord_20170329"
+    FLAGS.decode_downsample_factor = 1
+    FLAGS.temporal_downsample_factor = 5
+    FLAGS.data_provider = "nexar_large_speed"
+    # ground truth maker
+    FLAGS.speed_limit_as_stop = 2.0
+    FLAGS.stop_future_frames = 1
+    FLAGS.deceleration_thres = 1
+    FLAGS.no_slight_turn = True
 
+    # conditional setup
     if basenet == "32s":
         FLAGS.image_network_arch = "CaffeNet"
     elif basenet == "16s":
@@ -519,29 +458,11 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
         FLAGS.image_network_arch = "CaffeNet_dilation8"
         FLAGS.image_preprocess_pad = 0
 
-    FLAGS.resize_images = "228,228"
-    FLAGS.unique_experiment_name = tag
-    FLAGS.enable_basenet_dropout = True
-    FLAGS.add_dim_reduction = False
-    FLAGS.add_avepool_after_dim_reduction = True
-
-    if phase == "train":
-        # ensure that the data provider is not the bottleneck
-        FLAGS.num_readers = 4
-        FLAGS.num_preprocess_threads = 8
-        FLAGS.num_batch_join = 8
-    if phase == "eval":
-        FLAGS.save_best_model = True
-        if visEval:
-            FLAGS.pdf_normalize_bins = False
-            FLAGS.use_simplifed_continuous_vis = True
-            FLAGS.save_best_model = False
-
     if ptrain:
         FLAGS.city_data = 1
         FLAGS.segmentation_network_arch = "CaffeNet_dilation8"
         FLAGS.early_split = False
-        #FLAGS.cnn_split = 'drop6'
+        # TODO: hardcode
         if phase == "train":
             FLAGS.city_image_list = '/backup/BDDNexar/Harry_config/Color_train_harry.txt'
             FLAGS.city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_train_harry.txt'
@@ -549,15 +470,46 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
             FLAGS.city_image_list = '/backup/BDDNexar/Harry_config/Color_val_harry.txt'
             FLAGS.city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_val_harry.txt'
 
-    if phase == "test":
+    if phase == "train":
+        # ensure that the data provider is not the bottleneck
+        FLAGS.num_readers = 4
+        FLAGS.num_preprocess_threads = 8
+        FLAGS.num_batch_join = 8
+    elif phase == "eval":
+        FLAGS.eval_method = "car_discrete"
+
+        if visEval:
+            FLAGS.output_visualizations = True
+            FLAGS.run_once = True
+            FLAGS.save_best_model = False
+
+            FLAGS.subsample_factor = 10
+            FLAGS.pdf_normalize_bins = False
+            FLAGS.use_simplifed_continuous_vis = True
+        else:
+            FLAGS.output_visualizations = False
+            FLAGS.run_once = False
+            FLAGS.save_best_model = True
+
+            FLAGS.eval_interval_secs = 1
+            FLAGS.sleep_per_iteration = 1.0 / 3.0
+
+    elif phase == "stat":
+        set_gpu("0")
+        FLAGS.subset = "train"
+
+        FLAGS.stat_output_path = "data/" + tag + "/empirical_dist"
+        FLAGS.eval_method = "stat_labels"
+        FLAGS.no_image_input = True
+        FLAGS.subsample_factor = 10
+    elif phase == "board":
+        pass
+    elif phase == "test":
         FLAGS.subset="test"
         # TODO: polish to make it correct
         FLAGS.eval_method = "car_discrete"
-        FLAGS.output_visualizations = False
         FLAGS.run_once = True
-        FLAGS.sleep_per_iteration = 0.0
         FLAGS.city_data = 0
-        FLAGS.num_preprocess_threads = 4
 
         # find the ".bestmodel" if possible
         best_models = []
@@ -571,20 +523,15 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
         else:
             print("no best model found")
 
-    FLAGS.release_batch = True
+    if not (phase == "board" or phase == "stat"):
+        FLAGS.batch_size = 1 * FLAGS.num_gpus
+
 
 def common_final_settings_continous(phase, tag, port, basenet="32s", visEval=False, ptrain=False):
     common_final_settings(phase, tag, port, basenet, visEval, ptrain)
     if phase == "eval" or phase == "test":
         FLAGS.eval_method = "car_continuous"
     FLAGS.sub_arch_selection = "car_loc_xy"
-
-def common_v2():
-    # FLAGS.use_data_augmentation = True
-    FLAGS.cnn_feature = "drop7"
-    # FLAGS.basenet_keep_prob = 0.1
-    FLAGS.no_batch_norm = True
-    FLAGS.weight_decay_exclude_bias = False
 
 ######################################################################################
 ############### end of common settings ##########################
@@ -602,9 +549,7 @@ def common_config(phase):
     # related to training
     FLAGS.batch_size = 1
     FLAGS.log_device_placement = False
-    FLAGS.data_provider = "nexar_dataset"
     FLAGS.optimizer = "sgd"
-    FLAGS.data_dir = "/home/yang/si/data/nexar_100"
     FLAGS.profile = False
     FLAGS.model_definition = "car_stop_model"
     FLAGS.num_readers = 2
@@ -614,23 +559,15 @@ def common_config(phase):
     FLAGS.display_summary = 100
     FLAGS.checkpoint_interval = 1000
     FLAGS.input_queue_memory_factor = 8
-    FLAGS.momentum = 0.9
     FLAGS.examples_per_shard=1
     FLAGS.use_MIMO_inputs_pipeline=True
 
     # related to evaluation
-    FLAGS.run_once = True
-    FLAGS.eval_interval_secs=600
     FLAGS.subsample_factor=1
-    FLAGS.eval_method="car_stop"
-
-    # model related
-    FLAGS.pretrained_model_path = '/home/yang/si/data/pretrained_models/tf.caffenet.bin'
 
 def common_config_post(phase):
     FLAGS.eval_dir = os.path.join(FLAGS.train_dir, "eval")
     FLAGS.checkpoint_dir = FLAGS.train_dir
-
 
 def train():
     call(["python", "train.py"] + flags_to_cmd())
@@ -659,9 +596,6 @@ def flags_to_cmd():
     return out
 
 if __name__ == '__main__':
-    # python script_name train/eval/board small_config
-    # cd /data/hxu/new_scale/scale/tfcnn/ & python scripts/train_car_stop.py eval car_discrete_cnn_low_small
-    # cd /data/hxu/new_scale/scale/tfcnn/ & python scripts/train_car_stop.py train car_discrete_cnn_low_small
     phase=sys.argv[1]
     small_config=sys.argv[2]
 
