@@ -53,9 +53,9 @@ tf.app.flags.DEFINE_string('pretrained_model_checkpoint_path', '',
 # Yang: add flags to data provider and model definitions
 tf.app.flags.DEFINE_string('data_provider', '',
                            """The data reader class, which is located """
-                           """under the folder /data_providers/ """)
+                           """under the folder ./data_providers/ """)
 tf.app.flags.DEFINE_string('model_definition', '',
-                           """The data reader class, located at /models/""")
+                           """The data reader class, located at ./models/""")
 
 model = importlib.import_module("models.%s" % FLAGS.model_definition)
 dataset_module = importlib.import_module("data_providers.%s" % FLAGS.data_provider)
@@ -65,8 +65,6 @@ tf.app.flags.DEFINE_boolean('profile', False,
 tf.app.flags.DEFINE_float('clip_gradient_threshold', -1.0,
                             """If the gradient is larger than this value, then clip it.
                             Only valid when > 0""")
-
-
 
 tf.app.flags.DEFINE_float('initial_learning_rate', 0.1,
                           """Initial learning rate.""")
@@ -94,9 +92,6 @@ tf.app.flags.DEFINE_integer('display_summary', 100,
                             '''display tensorboard summary per this batch''')
 tf.app.flags.DEFINE_integer('checkpoint_interval', 5000,
                             '''checkpoint per this batch''')
-
-tf.app.flags.DEFINE_boolean('temp_disable_profile', False,
-                            '''disable profile''')
 
 def _tower_loss(inputs, outputs, num_classes, scope):
   # inputs and outputs are two lists of tensors
@@ -504,7 +499,7 @@ def train():
               print("generated a time line profile for one session")
           else:
               start_time_compute = time.time()
-              if (step + 1) % (FLAGS.display_summary * 10) == 0 and not FLAGS.temp_disable_profile:
+              if (step + 1) % (FLAGS.display_summary * 10) == 0:
                   has_run_meta = True
                   # profile in a longer interval
                   run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)

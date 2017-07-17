@@ -30,11 +30,12 @@ IGNORE_LABEL = 255
 tf.app.flags.DEFINE_string('arch_selection', 'LRCN',
                            """select which arch to use under this file""")
 tf.app.flags.DEFINE_string('sub_arch_selection', 'car_stop',
-                           """select which sub_arch to use under the arch """)
+                           """select which sub_arch to use under the arch
+                           available archs are car_stop, car_discrete, car_continuous""")
 
 
 tf.app.flags.DEFINE_string('pretrained_model_path', './data/tf.caffenet.bin',
-                           """The pretrained model weights""") #TODO: MOVED TO ./data, and release the pretrained model
+                           """The pretrained model weights""")
 
 tf.app.flags.DEFINE_string('lstm_hidden_units', "256,256",
                            """define how many hidden layers and the number of hidden units in each of them""")
@@ -44,7 +45,7 @@ tf.app.flags.DEFINE_string('conv_lstm_max_pool_factors', "2,2",
                            """conv lstm max pool factors, 1 for not using max pools""")
 
 tf.app.flags.DEFINE_string('cnn_feature', "fc7",
-                           """define how many hidden layers and the number of hidden units in each of them""")
+                           """which layer of CNN feature to use""")
 tf.app.flags.DEFINE_integer('projection_dim', 512,
                            """the projection dimesion (using 1*1 conv) before feeding into the LSTM""")
 tf.app.flags.DEFINE_string('train_stage_name', "stage_lstm",
@@ -60,7 +61,7 @@ tf.app.flags.DEFINE_boolean('add_dim_reduction', True,
 tf.app.flags.DEFINE_boolean('no_batch_norm', False,
                            """whether to use batch norm in the whole design""")
 tf.app.flags.DEFINE_boolean('weight_decay_exclude_bias', False,
-                           """do not want the bias to have weight decay""")
+                           """True if do not want the bias to have weight decay""")
 
 
 tf.app.flags.DEFINE_integer('add_hidden_layer_before_LSTM', -1,
@@ -76,12 +77,12 @@ tf.app.flags.DEFINE_integer('add_avepool_after_dim_reduction_with_stride', -1,
 
 
 tf.app.flags.DEFINE_string('image_network_arch', "CaffeNet",
-                           """which image base network to use, other options are Dilation""")
+                           """which image base network to use, other options are CaffeNet_dilation8""")
 tf.app.flags.DEFINE_string('segmentation_network_arch', "CaffeNet_dilation8",
-                           """which image base network to use, other options are Dilation""")
+                           """which image base network to use""")
 
 tf.app.flags.DEFINE_integer('image_preprocess_pad', -1,
-                           """How many padding to be added to the nexar image input""")
+                           """How many padding to be added to the image input""")
 
 # for CNN_FC baseline
 tf.app.flags.DEFINE_integer('history_window', 9,
@@ -89,61 +90,65 @@ tf.app.flags.DEFINE_integer('history_window', 9,
 tf.app.flags.DEFINE_integer('cnn_fc_hidden_units', 64,
                            """in the CNN_FC model, how many hidden units of temporal conv""")
 tf.app.flags.DEFINE_boolean('use_image_feature', True,
-                           """whether to use CNN feature in CNN_FC model""")
+                           """whether to use CNN feature""")
 tf.app.flags.DEFINE_boolean('use_previous_speed_feature', False,
-                           """whether to use previous speed in the CNN_FC model""")
+                           """whether to use previous speed""")
 
 # the continuous space discretization method
 tf.app.flags.DEFINE_integer('discretize_n_bins', 15,
                             '''how many bins to discretize for course and speed''')
 tf.app.flags.DEFINE_float('discretize_max_angle', math.pi / 3,
-                            '''consider the [-max_angle, +max_angle] as usual, using logbin''')
+                            '''max angle of the steering wheel''')
 tf.app.flags.DEFINE_float('discretize_min_angle', 0.017,
-                            '''consider the [-max_angle, +max_angle] as usual, using logbin''')
+                            '''min angle of the steering wheel, besides 0''')
 tf.app.flags.DEFINE_float('discretize_bound_angle', math.pi,
-                            '''consider the [-max_angle, +max_angle] as usual, using logbin''')
+                            '''the upper bound of the angle, larger than the discretize_max_angle''')
 
 tf.app.flags.DEFINE_float('discretize_max_speed', 30,
-                            '''consider the [0, +max_speed] as usual, using logbin''')
+                            '''max speed of the car for discretization''')
 tf.app.flags.DEFINE_float('discretize_min_speed', 0.3,
-                            '''consider the [0, +max_speed] as usual, using logbin''')
+                            '''min speed of the car''')
 tf.app.flags.DEFINE_float('discretize_bound_speed', 40,
-                            '''consider the [0, +max_speed] as usual, using logbin''')
+                            '''the upper bound of speed, larger than the discretize_max_speed''')
 tf.app.flags.DEFINE_float('discretize_label_gaussian_sigma', 1.0,
-                            '''the sigma parameter for gaussian dist''')
+                            '''the sigma parameter for gaussian smoothing''')
 tf.app.flags.DEFINE_float('discretize_min_prob', 1e-6,
                             '''min prob for each bin, avoid underflow''')
 tf.app.flags.DEFINE_string('discretize_bin_type', "log",
                             '''What kind of bins to use for discritization''')
 tf.app.flags.DEFINE_string('discretize_datadriven_stat_path', "",
-                            '''the file path to the data driven stat''')
+                            '''the file path to the data driven statistics''')
 
-tf.app.flags.DEFINE_integer('city_num_classes', '19', "class number for side train task")
-tf.app.flags.DEFINE_integer('side_info_baseline', '0', "0 if we use concatenate features, 1 if we only need image features")
-tf.app.flags.DEFINE_integer('PTrain', '0', 'if we want to use privileged training set this to 1')
+tf.app.flags.DEFINE_integer('city_num_classes', '19',
+                            "class number for side train task")
+tf.app.flags.DEFINE_integer('side_info_baseline', '0',
+                            "0 if we use concatenate features, 1 if we only need image features")
+tf.app.flags.DEFINE_integer('PTrain', '0',
+                            'if we want to use privileged training set this to 1')
 tf.app.flags.DEFINE_float('ptrain_weight', 1.0,
                           'The weight of the privilege loss')
 tf.app.flags.DEFINE_boolean('omit_action_loss', False,
                           'Omit the action loss for using the ptrain as pretraining')
 tf.app.flags.DEFINE_string('class_balance_path', "",
-                            '''Which empirical distribution path to use, if empty then don't use''')
+                            '''Which empirical distribution path to use, if empty then don't use balancing''')
 tf.app.flags.DEFINE_float('class_balance_epsilon', 0.01,
                             '''having this prob to draw from a uniform distribution''')
 
 tf.app.flags.DEFINE_string('temporal_net', "LSTM",
-                            '''Which temporal net to use''')
+                            '''Which temporal net to use, could be LSTM or CNN_FC''')
 
 tf.app.flags.DEFINE_boolean('normalize_before_concat', True,
-                            '''normalization before concatenation''')
+                            '''normalization before feature concatenation''')
 tf.app.flags.DEFINE_string('unique_experiment_name', "",
-                            '''If not empty, then use it to random init params''')
+                            '''the scope name of the architecture''')
 
 tf.app.flags.DEFINE_float('dropout_LSTM_keep_prob', -1,
                             '''dropout probability for LSTM''')
 tf.app.flags.DEFINE_boolean('pdf_normalize_bins', True,
                             '''Normalize the pdf for each bin. Disable it for visualization purpose''')
-tf.app.flags.DEFINE_string('cnn_split', 'conv4', 'where we want to split for priviledged training')
-tf.app.flags.DEFINE_boolean('early_split', False, 'do we want to split in a early stage')
+tf.app.flags.DEFINE_string('cnn_split', 'conv4',
+                           'where we want to split for priviledged training')
+tf.app.flags.DEFINE_boolean('early_split', False, 'whether split the network in an early stage')
 tf.app.flags.DEFINE_boolean('image_downsample', False, 'downsample to 384, 216')
 
 FLAGS = tf.app.flags.FLAGS
@@ -310,7 +315,7 @@ def LRCN(net_inputs, num_classes, for_training):
         if FLAGS.use_previous_speed_feature:
             speed = tf.reshape(speed, [shape[0], shape[1], 2])
             shift_amount = 5
-            # shift the speed by 2 frames
+            # shift the speed by 5 frames
             speed = tf.pad(speed,
                           [[0, 0], [shift_amount, 0], [0, 0]],
                           mode='CONSTANT',
@@ -321,14 +326,6 @@ def LRCN(net_inputs, num_classes, for_training):
             all_features.append(speed)
 
         ############# concatenate other information source #############
-        if FLAGS.data_provider == "nexar_dataset":
-            previousEgomotion = tf.reshape(previousEgomotion, [shape[0], shape[1], -1])
-            isvalid = tf.reshape(isvalid, [shape[0], shape[1], -1])
-            isvalid = tf.cast(isvalid, tf.float32)
-            # concatenate
-            all_features.append(previousEgomotion)
-            all_features.append(isvalid)
-        
         if FLAGS.only_seg == 1 :
             ctx_features_tmp = tf.transpose(ctx, perm = [0,1,3,4,2])
             all_features = [tf.reshape(ctx_features_tmp, [shape[0],shape[1], -1])]
@@ -550,10 +547,6 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
             tf.image_summary("segmentation_visualization", pred, max_images=113)
 
     return city_segmentation_features
-
-
-
-
 
 
 def CNN_FC(net_inputs, num_classes, for_training):

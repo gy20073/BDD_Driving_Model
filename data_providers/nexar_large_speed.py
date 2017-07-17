@@ -31,20 +31,20 @@ city_frames = 5
 city_lock = multiprocessing.Lock()
 
 # Visual preprocessing FLAGS
-tf.app.flags.DEFINE_integer('IM_WIDTH', 640, '''width of image''')
-tf.app.flags.DEFINE_integer('IM_HEIGHT', 360, '''height of image''')
+tf.app.flags.DEFINE_integer('IM_WIDTH', 640, '''width of image in TFRecord''')
+tf.app.flags.DEFINE_integer('IM_HEIGHT', 360, '''height of image in TFRecord''')
 tf.app.flags.DEFINE_string('resize_images', "",
                            """If not empty resize the images to the required shape. Shape format: height,width""")
 tf.app.flags.DEFINE_integer('decode_downsample_factor', 1,
-                            '''The original high res video is 1280*720. For training purpose, this resolution '''
+                            '''The original high res video is 640*360. For training purpose, this resolution '''
                             '''might be too high. This param downsample the image during jpeg decode process''')
 tf.app.flags.DEFINE_integer('temporal_downsample_factor', 5,
-                            '''How many previous egomotion ground truth steps to provide'''
+                            '''The original video is in 15 FPS, this flag optionally downsample the video temporally'''
                             '''All other frame related operations are carried out after temporal downsampling''')
 
 # data usage FLAGS
 tf.app.flags.DEFINE_integer('n_sub_frame', 108,
-                            'How many frames does one instance contains. Reduce this for larger network')
+                            'How many frames does one instance contains. Reduce this for larger network if memory not enough')
 tf.app.flags.DEFINE_integer('stop_future_frames', 2,
                             '''Shift the stop labels * frames forward, to predict the future''')
 tf.app.flags.DEFINE_float('speed_limit_as_stop', 0.3,
@@ -54,29 +54,36 @@ tf.app.flags.DEFINE_boolean('no_image_input', False,
 tf.app.flags.DEFINE_float('balance_drop_prob', -1.0,
                           '''drop no stop seq with specified probability. Don't drop if it < 0''')
 tf.app.flags.DEFINE_float('acceleration_thres', -1.0,
-                          '''acceleration threshold, minus for not using it''')
+                          '''acceleration threshold, minus value for not using it''')
 tf.app.flags.DEFINE_float('deceleration_thres', -1.0,
-                          '''deceleration threshold, minus for not using it''')
+                          '''deceleration threshold, minus value for not using it''')
 tf.app.flags.DEFINE_boolean('no_slight_turn', True,
                             '''if true, then don't use slight left or right turn''')
 tf.app.flags.DEFINE_boolean('non_random_temporal_downsample', False,
-                            '''if true, don't use random augmentation''')
-tf.app.flags.DEFINE_string('fast_jpeg_decode', "tf",
-                            'which type of jpeg decode to use: default, tf, pyfunc')
+                            '''if true, use fixed downsample method''')
+tf.app.flags.DEFINE_string('fast_jpeg_decode', "default",
+                            '''which type of jpeg decode to use: default, tf, pyfunc'''
+                            '''tf is the fastest and could reduce CPU usage a lot, but require compilation''')
 #dataset specified FLAGS
-tf.app.flags.DEFINE_string('city_image_list','/data/hxu/fineGT/trainval_images.txt', 'the images we want')
+tf.app.flags.DEFINE_string('city_image_list','/data/hxu/fineGT/trainval_images.txt',
+                           'the privilege training segmentation image index')
 tf.app.flags.DEFINE_string('city_label_list','/data/hxu/fineGT/trainval_labels.txt', 
-                           'the image labels we want')
-tf.app.flags.DEFINE_integer('city_data',0,'if we want side training with cityscape, set this to 1')
+                           'the privilege training segmentation label image index')
+tf.app.flags.DEFINE_integer('city_data',0,'if we want side training with segmentation, set this to 1')
 tf.app.flags.DEFINE_integer('only_seg',0, 'if we want to only use segmentation, set this to 1')
-tf.app.flags.DEFINE_integer('FRAMES_IN_SEG',540,'frames in seg')
-tf.app.flags.DEFINE_integer('city_batch', 1, "city batch size")
+tf.app.flags.DEFINE_integer('FRAMES_IN_SEG',540,
+                            'How many frames in a single TFRecord, this is conservatively set to 36second * 15fps')
+tf.app.flags.DEFINE_integer('city_batch', 1, "segmentation batch size")
 tf.app.flags.DEFINE_boolean('is_small_side_info_dataset', False,
-                            '''if true, use smaller size''')
-tf.app.flags.DEFINE_boolean('low_res', False, 'use low_res data or not')
+                            '''if true, use smaller segmentation dataset''')
+tf.app.flags.DEFINE_boolean('low_res', False,
+                            '''The BDD video dataset comes with 2 resolution, this flags optionally allow
+                            to use the lower resolution dataset''')
 tf.app.flags.DEFINE_float('frame_rate', 15.0, 'the frame_rate we have for the videos')
-tf.app.flags.DEFINE_string('train_filename', 'train_small.txt','the file list we used to train')
-tf.app.flags.DEFINE_boolean('release_batch', False, 'The batch we want to use for the released dataset' )
+tf.app.flags.DEFINE_string('train_filename', 'train_small.txt',
+                           '''the file name list we used to train. This is useful for super large dataset, such as
+                           the low resolution part of BDD video dataset. It avoids to Glob all files when training start''')
+tf.app.flags.DEFINE_boolean('release_batch', False, 'True if the dataset is the finally released version' )
 tf.app.flags.DEFINE_boolean('use_data_augmentation', False, 'whether to augment the training data' )
 
 tf.app.flags.DEFINE_integer('retain_first_k_training_example', -1,
@@ -104,15 +111,13 @@ class MyDataset(Dataset):
                 return FLAGS.retain_first_k_training_example
 
             if FLAGS.low_res:
-                #raise ValueError("low res training set #examples not set")
                 # TODO: change to these names
                 if FLAGS.train_filename == 'train_small.txt':
-                    return 25497#20000
+                    return 25497
                 elif FLAGS.train_filename == 'train_medium.txt':
-                    return 192514#200000
+                    return 192514
                 elif FLAGS.train_filename == 'train_large.txt':
                     return 2000000
-                #return 872768
             elif FLAGS.is_small_side_info_dataset:
                 return 945
             elif FLAGS.release_batch:
@@ -121,9 +126,7 @@ class MyDataset(Dataset):
                 return 28738
         if self.subset == 'validation':
             if FLAGS.low_res:
-                #raise ValueError("low res training set #examples not set")
-                return 12877#10000
-                #return 58144
+                return 12877
             elif FLAGS.is_small_side_info_dataset:
                 return 101
             elif FLAGS.release_batch:

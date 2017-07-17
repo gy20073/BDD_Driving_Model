@@ -27,13 +27,13 @@ tf.app.flags.DEFINE_string('subset', 'validation',
 
 # Yang: add flags to data provider and model definitions
 tf.app.flags.DEFINE_string('data_provider', '',
-                           """The data reader class, which is located """)
+                           """The data reader class, which is located under ./data_provider/ """)
 tf.app.flags.DEFINE_string('model_definition', '',
-                           """The data reader class""")
+                           """The model class""")
 dataset_module = importlib.import_module("data_providers.%s" % FLAGS.data_provider)
 model = importlib.import_module("models.%s" % FLAGS.model_definition)
 
-tf.app.flags.DEFINE_string('eval_method', 'classification',
+tf.app.flags.DEFINE_string('eval_method', 'stat_labels',
                            """The function to evaluate the current task""")
 tf.app.flags.DEFINE_string('stat_output_path', '',
                            """Directory where to write stat out""")

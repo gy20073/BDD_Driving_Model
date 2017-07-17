@@ -43,11 +43,11 @@ tf.app.flags.DEFINE_integer('subsample_factor', 1,
 
 # Flags governing the data used for the eval.
 tf.app.flags.DEFINE_string('subset', 'validation',
-                           """Either 'validation' or 'train'.""")
+                           """Either 'validation' 'test' or 'train'.""")
 
 # Yang: add flags to data provider and model definitions
 tf.app.flags.DEFINE_string('data_provider', '',
-                           """The data reader class, which is located """)
+                           """The data reader class, which is located under ./data_provider/""")
 tf.app.flags.DEFINE_string('model_definition', '',
                            """The data reader class""")
 dataset_module = importlib.import_module("data_providers.%s" % FLAGS.data_provider)
@@ -64,9 +64,9 @@ tf.app.flags.DEFINE_boolean('imagenet_offset', False,
                             """Whether to subtract one from labels to match caffe model""")
 
 tf.app.flags.DEFINE_boolean('use_simplifed_continuous_vis', False,
-                            """""")
+                            """use a simplified version of visualization""")
 tf.app.flags.DEFINE_float('sleep_per_iteration', -1.0,
-                          '''how long to sleep per iteration''')
+                          '''how long to sleep per iteration, use when fastest evaluation is not necessary''')
 tf.app.flags.DEFINE_boolean('save_best_model', False,
                             """save the best model during validation""")
 
@@ -165,92 +165,6 @@ def _eval_once(saver, summary_writer, logits_all, labels, loss_op, summary_op, t
 
     coord.request_stop()
     coord.join(threads, stop_grace_period_secs=10)
-
-def car_stop(logits_all, labels_in, loss_op, sess, coord, summary_op, tensors_in, summary_writer):
-  # the images and lables are multiple tensor lists, to get the label tensor, fetch the first entry
-  logits = logits_all[0]
-  labels = labels_in[0]
-
-  labels = tf.reshape(labels, [-1])
-  # filter the negative labels
-  labels, logits = util.filter_no_groundtruth_label(labels, logits)
-
-  top_1_op = tf.nn.in_top_k(logits, labels, 1)
-  prediction = tf.argmax(logits[:,0:2], 1)
-
-  num_iter = int(math.ceil(FLAGS.num_examples / FLAGS.batch_size))
-  # Counts the number of correct predictions.
-  count_top_1 = 0.0
-  count_label_cross_predict = [[0,0], [0,0]]
-  total_loss = 0.0
-  total_sample_count = 0
-  step = 0
-  logits_all = np.zeros((0,2), dtype=np.float32)
-  labels_all = np.zeros(0, dtype=np.int32)
-
-  print('%s: starting evaluation on (%s).' % (datetime.now(), FLAGS.subset))
-  start_time = time.time()
-  while step < num_iter and not coord.should_stop():
-
-    if FLAGS.output_visualizations:
-      top_1, loss_v, labels_v, prediction_v, logits_v , tin_out_v= \
-        sess.run([top_1_op, loss_op, labels, prediction, logits, tensors_in+labels_in])
-      tin_out_v.append(prediction_v)
-      
-      for isample in range(FLAGS.batch_size):
-        util_car.vis_reader_stop_go(tin_out_v,
-                              prediction_v,
-                              FLAGS.frame_rate/FLAGS.temporal_downsample_factor,
-                              isample,
-                              True,
-                              os.path.join(FLAGS.eval_dir, "viz"),
-                              FLAGS.data_provider)
-    else:
-      top_1, loss_v, labels_v, prediction_v, logits_v = \
-        sess.run([top_1_op, loss_op, labels, prediction, logits])
-    logits_all = np.concatenate((logits_all, logits_v[:, 0:2]), axis=0)
-    labels_all = np.concatenate((labels_all, labels_v), axis=0)
-
-    nsample = labels_v.size
-    count_top_1 += np.sum(top_1)
-    
-    for ll, pp in zip(labels_v, prediction_v):
-        count_label_cross_predict[ll][pp] += 1
-
-    total_loss = total_loss + loss_v[0]
-    step += 1
-    total_sample_count += nsample
-
-    if step % 20 == 0:
-      duration = time.time() - start_time
-      sec_per_batch = duration / 20.0
-      examples_per_sec = FLAGS.batch_size / sec_per_batch
-      print('%s: [%d batches out of %d] (%.1f examples/sec; %.3f'
-            'sec/batch)' % (datetime.now(), step, num_iter,
-                            examples_per_sec, sec_per_batch))
-      start_time = time.time()
-
-  # Compute precision @ 1.
-  precision_at_1 = count_top_1 / total_sample_count
-  total_loss = total_loss / step
-  print('%s: precision @ 1 = %.4f mean loss = %.4f [%d examples]' %
-        (datetime.now(), precision_at_1, total_loss, total_sample_count))
-  for i in range(2):
-      for j in range(2):
-          print("label=%d, prediction=%d, count=%d" % (i, j, count_label_cross_predict[i][j]))
-
-  summary = tf.Summary()
-  summary.ParseFromString(sess.run(summary_op))
-  precision_real = count_label_cross_predict[1][1] * 1.0 / (count_label_cross_predict[1][1] + count_label_cross_predict[0][1])
-  recall_real = count_label_cross_predict[1][1] * 1.0 / (count_label_cross_predict[1][0] + count_label_cross_predict[1][1])
-  auc = roc_auc_score(labels_all, logits_all[:, 1] - logits_all[:, 0])
-  print("precision = %f, recall = %f, auc=%f" % (precision_real, recall_real, auc))
-  summary.value.add(tag='Accuracy', simple_value=precision_at_1)
-  summary.value.add(tag='AUC', simple_value=auc)
-  summary.value.add(tag='precision_real', simple_value=precision_real)
-  summary.value.add(tag='recall_real', simple_value=recall_real)
-  return summary
-
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
