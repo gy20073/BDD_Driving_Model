@@ -37,6 +37,7 @@ tf.app.flags.DEFINE_string('eval_method', 'stat_labels',
                            """The function to evaluate the current task""")
 tf.app.flags.DEFINE_string('stat_output_path', '',
                            """Directory where to write stat out""")
+tf.app.flags.DEFINE_boolean('stat_datadriven_only', False, 'whether only care about the data driven stats')
 
 def stat_labels(labels_in, sess, coord, tensors_in):
     labels_stop = labels_in[0]  # shape: N * F
@@ -53,10 +54,11 @@ def stat_labels(labels_in, sess, coord, tensors_in):
     num_classes = future_labels.get_shape()[-1].value
     future_labels = tf.reshape(future_labels, [-1, num_classes])
 
-    # up to now, each of them is NF * Nbins tensor
-    dense_course, dense_speed = tf.py_func(model.call_label_to_dense_smooth,
-                                           [future_labels],
-                                           [tf.float32, tf.float32])
+    if not FLAGS.stat_datadriven_only:
+        # up to now, each of them is NF * Nbins tensor
+        dense_course, dense_speed = tf.py_func(model.call_label_to_dense_smooth,
+                                               [future_labels],
+                                               [tf.float32, tf.float32])
 
     # TODO get the joint stat
 
@@ -76,21 +78,27 @@ def stat_labels(labels_in, sess, coord, tensors_in):
         if coord.should_stop():
             break
 
-        discrete_v, dc, ds, labels_stop_v, future_labels_v = \
-            sess.run([discrete_labels, dense_course, dense_speed, labels_stop,future_labels])
+        if not FLAGS.stat_datadriven_only:
+            discrete_v, dc, ds, labels_stop_v, future_labels_v = \
+                sess.run([discrete_labels, dense_course, dense_speed, labels_stop,future_labels])
+            dc = np.mean(dc, axis=0)
+            ds = np.mean(ds, axis=0)
+        else:
+            discrete_v, labels_stop_v, future_labels_v = \
+                sess.run([discrete_labels, labels_stop, future_labels])
         discrete_v = np.mean(discrete_v, axis=0)
-        dc = np.mean(dc, axis=0)
-        ds = np.mean(ds, axis=0)
 
         if step == 0:
             discrete_acc = discrete_v
-            course_acc = dc
-            speed_acc = ds
+            if not FLAGS.stat_datadriven_only:
+                course_acc = dc
+                speed_acc = ds
             future_acc = future_labels_v
         else:
             discrete_acc += discrete_v
-            course_acc += dc
-            speed_acc += ds
+            if not FLAGS.stat_datadriven_only:
+                course_acc += dc
+                speed_acc += ds
             future_acc = np.concatenate((future_acc, future_labels_v), axis=0)
 
         for l in labels_stop_v:
@@ -107,14 +115,16 @@ def stat_labels(labels_in, sess, coord, tensors_in):
             start_time = time.time()
 
     discrete_acc /= count
-    course_acc /= count
-    speed_acc /= count
+    if not FLAGS.stat_datadriven_only:
+        course_acc /= count
+        speed_acc /= count
 
     stop_acc = 1.0 * stop_acc / np.sum(stop_acc)
 
     np.save(FLAGS.stat_output_path + "_stop", stop_acc)
     np.save(FLAGS.stat_output_path + "_discrete", discrete_acc)
-    np.save(FLAGS.stat_output_path + "_continuous", (course_acc, speed_acc))
+    if not FLAGS.stat_datadriven_only:
+        np.save(FLAGS.stat_output_path + "_continuous", (course_acc, speed_acc))
     np.save(FLAGS.stat_output_path + "_dataDriven", future_acc)
 
     return None

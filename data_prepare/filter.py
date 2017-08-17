@@ -47,4 +47,4 @@ if __name__ == '__main__':
             # print duration
             if 60 > duration > 38:
                 with open(output_index, "a") as myfile:
-                    myfile.write(os.path.abspath(this_video))
+                    myfile.write(os.path.abspath(this_video)+"\n")

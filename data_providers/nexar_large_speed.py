@@ -121,7 +121,9 @@ class MyDataset(Dataset):
             elif FLAGS.is_small_side_info_dataset:
                 return 945
             elif FLAGS.release_batch:
-                return 21808
+                # finalized version
+                return 21204
+                #return 21808
             else:
                 return 28738
         if self.subset == 'validation':
@@ -130,7 +132,9 @@ class MyDataset(Dataset):
             elif FLAGS.is_small_side_info_dataset:
                 return 101
             elif FLAGS.release_batch:
-                return 1470
+                # finalized version
+                return 1867
+                #return 1470
             else:
                 return 1906
 

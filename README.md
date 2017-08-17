@@ -40,6 +40,7 @@ BDD-V dataset will be released here. Sign up for notification when we release th
     * matplotlib
     * numpy
     * sklearn
+    * ffprobe
 
 ```bash
 bash Anaconda2-4.3.1-Linux-x86_64.sh

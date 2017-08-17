@@ -10,7 +10,7 @@ FLAGS = tf.app.flags.FLAGS
 
 ############################Set those path before use###################################
 FLAGS.pretrained_model_path = "/data/yang/si/data/pretrained_models/tf.caffenet.bin"
-FLAGS.data_dir = "/data/yang/data/tfrecord_20170329"
+FLAGS.data_dir = "/data/yang_cache/tfrecord_release/tfrecords"
 
 # for privilege training: segmentation image index and labels
 train_city_image_list = '/backup/BDDNexar/Harry_config/Color_train_harry.txt'
@@ -21,7 +21,7 @@ eval_city_label_list = '/backup/BDDNexar/Harry_config/TrainLabels_val_harry.txt'
 ############################discrete action###################################
 def discrete_speed_only(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "1", "1")
+    set_gpu_ids(phase, "0", "0")
     if phase == "train":
         FLAGS.batch_size = 10
 
@@ -42,7 +42,7 @@ def discrete_speed_only(phase):
 
 def discrete_tcnn1(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "2", "5")
+    set_gpu_ids(phase, "2", "0")
     common_final_settings(phase,
                           tag,
                           7271)
@@ -55,7 +55,7 @@ def discrete_tcnn1(phase):
 
 def discrete_tcnn3(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "0", "7")
+    set_gpu_ids(phase, "3", "4")
     common_final_settings(phase,
                           tag,
                           7294)
@@ -68,7 +68,7 @@ def discrete_tcnn3(phase):
 
 def discrete_tcnn9(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "0", "0")
+    set_gpu_ids(phase, "4", "5")
     common_final_settings(phase,
                           tag,
                           7275)
@@ -81,7 +81,7 @@ def discrete_tcnn9(phase):
 
 def discrete_cnn_lstm(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "3", "1")
+    set_gpu_ids(phase, "5", "6")
     common_final_settings(phase,
                           tag,
                           7273)
@@ -89,7 +89,7 @@ def discrete_cnn_lstm(phase):
 
 def discrete_cnn_lstm_speed(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "1", "1")
+    set_gpu_ids(phase, "6", "7")
     common_final_settings(phase,
                           tag,
                           7278)
@@ -99,7 +99,7 @@ def discrete_cnn_lstm_speed(phase):
 
 def discrete_fcn_lstm(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "2", "6")
+    set_gpu_ids(phase, "7", "3")
     common_final_settings(phase,
                           tag,
                           7277,
@@ -110,11 +110,11 @@ def discrete_fcn_lstm(phase):
 ############################continuous action###################################
 def continuous_linear_bin(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "0", "7")
+    set_gpu_ids(phase, "0", "5")
     common_final_settings_continous(phase,
                                     tag,
                                     7260)
-    set_train_stage(False, 0)
+    set_train_stage(False, 110001)
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_max_speed = 30 * 0.99
@@ -130,7 +130,7 @@ def continuous_log_bin(phase):
     common_final_settings_continous(phase,
                                     tag,
                                     7297)
-    set_train_stage(False, 20000)
+    set_train_stage(False, 149001)
 
     FLAGS.discretize_max_angle = math.pi / 2 * 0.99
     FLAGS.discretize_min_angle = 0.1 / 180 * math.pi
@@ -148,7 +148,7 @@ def continuous_datadriven_bin(phase):
     common_final_settings_continous(phase,
                                     tag,
                                     7298)
-    set_train_stage(False, 0)
+    set_train_stage(False, 91001)
 
     FLAGS.discretize_max_speed = 30 * 0.99
     FLAGS.discretize_label_gaussian_sigma = 0.5
@@ -157,11 +157,12 @@ def continuous_datadriven_bin(phase):
     FLAGS.discretize_n_bins = 181
     FLAGS.discretize_datadriven_stat_path = "data/" + tag + "/empirical_dist_dataDriven.npy"
 
+    FLAGS.stat_datadriven_only = True
 
 ####################### priviledge training  #######################
 def ptrain_1000_FCN(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "0", "7")
+    set_gpu_ids(phase, "3", "6")
     common_final_settings(phase,
                           tag,
                           7286,
@@ -170,20 +171,20 @@ def ptrain_1000_FCN(phase):
                           ptrain=True)
 
     FLAGS.num_epochs_per_decay = 20
-    set_train_stage(False, 8500)
+    set_train_stage(False, 53001)
 
     FLAGS.retain_first_k_training_example = 1000
 
 def ptrain_1000_baseline_FCN(phase):
     tag = inspect.stack()[0][3]
-    set_gpu_ids(phase, "0", "6")
+    set_gpu_ids(phase, "4", "5")
     common_final_settings(phase,
                           tag,
                           7287,
                           basenet="8s")
 
     FLAGS.num_epochs_per_decay = 20
-    set_train_stage(False, 12000)
+    set_train_stage(False, 80001)
 
     FLAGS.retain_first_k_training_example = 1000
 
@@ -298,7 +299,7 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
             FLAGS.save_best_model = True
 
             FLAGS.eval_interval_secs = 1
-            FLAGS.sleep_per_iteration = 1.0 / 3.0
+            FLAGS.sleep_per_iteration = 1.0 / 2
 
     elif phase == "stat":
         set_gpu("0")

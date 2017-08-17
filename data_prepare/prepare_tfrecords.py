@@ -11,7 +11,7 @@ import subprocess
 
 import tensorflow as tf
 from tensorflow.core.example import example_pb2
-from data_prepare.json_to_speed import get_interpolated_speed
+from json_to_speed import get_interpolated_speed
 from PIL import Image
 import numpy as np
 import cProfile
