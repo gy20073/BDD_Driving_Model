@@ -1090,9 +1090,7 @@ def continous_MAP_car_loc_xy_custom(logits):
     return np.stack(inters, axis=1)
 
 def continous_MAP_car_loc_xy_datadriven(logits):
-    # since we decide to show distribution, instead of MAP, skipping this implementation
-    # TODO: implement this
-    raise NotImplemented()
+    return continous_MAP_car_loc_xy_custom(logits)
 
 def continous_MAP(logits):
     func = globals()["continous_MAP_%s_%s" %

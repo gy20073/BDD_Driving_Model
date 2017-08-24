@@ -105,6 +105,7 @@ def discrete_fcn_lstm(phase):
                           7277,
                           basenet="8s")
     set_train_stage(False, 34000)
+    FLAGS.num_epochs_per_decay = 12
 
 
 ############################continuous action###################################
@@ -299,7 +300,7 @@ def common_final_settings(phase, tag, port, basenet="32s", visEval=False, ptrain
             FLAGS.save_best_model = True
 
             FLAGS.eval_interval_secs = 1
-            FLAGS.sleep_per_iteration = 1.0 / 2
+            FLAGS.sleep_per_iteration = 1.0 / 4
 
     elif phase == "stat":
         set_gpu("0")
@@ -363,7 +364,7 @@ def common_config(phase):
     FLAGS.num_preprocess_threads = 4
     FLAGS.display_loss = 10
     FLAGS.display_summary = 100
-    FLAGS.checkpoint_interval = 1000
+    FLAGS.checkpoint_interval = 5000
     FLAGS.input_queue_memory_factor = 8
     FLAGS.examples_per_shard=1
     FLAGS.use_MIMO_inputs_pipeline=True
