@@ -315,7 +315,9 @@ def parallel_run():
 
 if __name__ == '__main__':
     if FLAGS.low_res:
-        print("Warning: using low res specific settings") 
+        print("Warning: using low res specific settings")
+    if not tf.gfile.Exists(FLAGS.output_directory):
+        tf.gfile.MakeDirs(FLAGS.output_directory)
     parallel_run()
 
     '''
