@@ -15,6 +15,7 @@ import numpy as np
 import data_providers.nexar_large_speed
 import batching
 import dataset
+import util_car
 
 FLAGS = tf.app.flags.FLAGS
 flags_passthrough = FLAGS._parse_flags()
@@ -101,3 +102,6 @@ class Wrapper:
 
     def continuous_MAP(self, logits):
         return model.continous_MAP(logits)
+
+    def generate_visualization(self, image, logits):
+        return util_car.continuous_vis_single_image(image, logits)

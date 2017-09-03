@@ -803,7 +803,7 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
 
 
 def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
-                 j=0, save_visualize=False, dir_name="temp", vis_radius=10):
+                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True):
     decoded, speed, name, isstop, turn, locs = tout
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
@@ -904,16 +904,19 @@ def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
         plt.imshow(images[i, :, :, :])
         plt.axis('off')
 
-        course = softmax(predict[i:(i + 1), 0:FLAGS.discretize_n_bins])
+        if need_softmax:
+            course = softmax(predict[i:(i + 1), 0:FLAGS.discretize_n_bins])
+        else:
+            course = predict[i:(i + 1), 0:FLAGS.discretize_n_bins]
         course = course/np.max(course)
 
         radius = int(hi/2)
         ada2 = plot_greens(course_bin, course, wi, hi, radius, -locs[i, 0]*180/math.pi+90)
         ax_original.add_artist(ada2)
-        plt.show()
+        #plt.show()
 
         if not os.path.exists(os.path.join(dir_name,'viz')):
-            os.mkdir(os.path.join(dir_name,'viz'))
+            os.makedirs(os.path.join(dir_name,'viz'))
         if not os.path.exists(os.path.join(dir_name,'viz', short_name)):
             os.mkdir(os.path.join(dir_name, 'viz', short_name))
         fig.savefig(os.path.join(dir_name, 'viz', short_name, '{0:04}.png'.format(i)),
@@ -922,3 +925,27 @@ def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
         print(short_name)
 
     print("showing visualization for video %s" % name[j])
+
+from scipy import misc
+import matplotlib
+def continuous_vis_single_image(image, logit):
+    matplotlib.use('Agg')
+    assert len(image.shape)==3
+    name = ["single_image"]
+    fake_locs = np.array([[[0.0, 0.0]]])
+    tout = (np.reshape(image, (1, 1, image.shape[0], image.shape[1], image.shape[2])),
+            None,
+            name,
+            None,
+            None,
+            fake_locs)
+    predict = np.reshape(logit, (1, 2*FLAGS.discretize_n_bins))
+    dir_name = "temp"
+    import models.car_stop_model as car_stop_model
+    vis_continuous_interpolated(tout, predict,
+                                frame_rate=None,
+                                car_stop_model=car_stop_model,
+                                j=0, save_visualize=None, dir_name=dir_name, vis_radius=None, need_softmax=False)
+    path = os.path.join(dir_name, 'viz', name[0], '{0:04}.png'.format(0))
+    image = misc.imread(path, mode='RGB')
+    return image
