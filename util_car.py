@@ -420,7 +420,7 @@ def draw_sector(image,
     return image
 
 def vis_continuous(tout, predict, frame_rate, car_stop_model,
-                 j=0, save_visualize=False, dir_name="temp"):
+                 j=0, save_visualize=False, dir_name="temp", return_first=False, **kwargs):
     decoded, speed, name, isstop, turn, locs = tout
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
@@ -456,6 +456,10 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
                                                  lines_color=lines_v,
                                                  fontsize=15)
     print("showing visualization for video %s" % name[j])
+
+    if return_first:
+        return images[0, :, :, :].astype(np.uint8)
+
     if save_visualize:
         _, short_name = os.path.split(name[j])
         short_name = short_name.split(".")[0]
@@ -803,7 +807,7 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
 
 
 def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
-                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True):
+                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True, return_first=False):
     decoded, speed, name, isstop, turn, locs = tout
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
@@ -925,10 +929,14 @@ def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
         print(short_name)
 
     print("showing visualization for video %s" % name[j])
+    if return_first:
+        path = os.path.join(dir_name, 'viz', name[0], '{0:04}.png'.format(0))
+        image = misc.imread(path, mode='RGB')
+        return image
 
 from scipy import misc
 import matplotlib
-def continuous_vis_single_image(image, logit):
+def continuous_vis_single_image(image, logit, method="full"):
     matplotlib.use('Agg')
     assert len(image.shape)==3
     name = ["single_image"]
@@ -942,10 +950,18 @@ def continuous_vis_single_image(image, logit):
     predict = np.reshape(logit, (1, 2*FLAGS.discretize_n_bins))
     dir_name = "temp"
     import models.car_stop_model as car_stop_model
-    vis_continuous_interpolated(tout, predict,
-                                frame_rate=None,
-                                car_stop_model=car_stop_model,
-                                j=0, save_visualize=None, dir_name=dir_name, vis_radius=None, need_softmax=False)
-    path = os.path.join(dir_name, 'viz', name[0], '{0:04}.png'.format(0))
-    image = misc.imread(path, mode='RGB')
+    if method == "full":
+        func = vis_continuous
+    elif method == "fancy":
+        func = vis_continuous_interpolated
+    else:
+        raise ValueError("invalid method option")
+
+    image = func(tout, predict,
+                 frame_rate=None,
+                 car_stop_model=car_stop_model,
+                 j=0, save_visualize=None,
+                 dir_name=dir_name, vis_radius=None,
+                 need_softmax=False, return_first=True)
+
     return image

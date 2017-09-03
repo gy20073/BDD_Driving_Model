@@ -103,5 +103,5 @@ class Wrapper:
     def continuous_MAP(self, logits):
         return model.continous_MAP(logits)
 
-    def generate_visualization(self, image, logits):
-        return util_car.continuous_vis_single_image(image, logits)
+    def generate_visualization(self, image, logits, method="full"):
+        return util_car.continuous_vis_single_image(image, logits, method)
