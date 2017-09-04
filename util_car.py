@@ -113,9 +113,9 @@ def write_text_on_image(image, string,
         draw.text((0, 0), string, (255, 0, 0), font=font)
 
     for line in lines:
-        draw.line(line, fill=128, width=3)
+        draw.line(line, fill=128, width=1)
     for line in lines_color:
-        draw.line(line[0], fill=line[1], width=3)
+        draw.line(line[0], fill=line[1], width=1)
 
     return np.array(j)
 
@@ -502,7 +502,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
                     course_delta=0.1 / 180 * math.pi,
                     speed_delta=0.1,
                     pdf_multiplier=255*10,
-                    speed_multiplier=int(wi/30/3/1.6),
+                    speed_multiplier=int(wi/30/3),
                     h=hi, w=wi,
                     uniform_speed=True)
 
@@ -513,7 +513,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         if locs[i, 1] < map.ravel()[1]:
             lines_v = [lines_v[1], lines_v[0]]
         '''
-        lines_v = [(gtline, (255,0,0))]
+        lines_v = [(gtline, (255,0,0)), [mapline, (0,0,255)]]
 
         images[i, :, :, :] = write_text_on_image(images[i, :, :, :],
                                                  showing_str,

@@ -1087,7 +1087,7 @@ def continous_MAP_car_loc_xy_custom(logits):
     small_angle = 0.3/180*math.pi
     inters[0][-small_angle < inters[0] < small_angle] = 0.0
 
-    return np.stack(inters, axis=1)
+    return np.stack(inters, axis=1) # will return a #samples * 2 array
 
 def continous_MAP_car_loc_xy_datadriven(logits):
     return continous_MAP_car_loc_xy_custom(logits)
