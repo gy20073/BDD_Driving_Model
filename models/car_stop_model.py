@@ -648,7 +648,7 @@ def samples_to_bins(samples, nbins, minwidth):
 def get_bins_datadriven():
     global datadriven_bins_cache
     if datadriven_bins_cache is not None:
-        return datadriven_bins_cache
+        return copy.deepcopy(datadriven_bins_cache)
 
     # default should be 181
     nbins = FLAGS.discretize_n_bins - 1
