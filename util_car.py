@@ -488,6 +488,12 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         map[1] = 10.0
         mapline = move_to_line(map, hi, wi, 10)
 
+        # get map2
+        map2 = car_stop_model.continous_MAP([predict[i:(i + 1), :]], return_second_best=True)
+        map2 = map2.ravel()
+        map2[1] = 10.0
+        mapline2 = move_to_line(map2, hi, wi, 10)
+
         showing_str = [
             [(0, 0), "driver's  angular speed: %.2f degree/s" % (locs[i, 0] / math.pi * 180), (255, 0, 0)],
             [(0, 20), "predicted angular speed: %.2f degree/s" % (map[0] / math.pi * 180), (0, 0, 255)]]
@@ -513,7 +519,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         if locs[i, 1] < map.ravel()[1]:
             lines_v = [lines_v[1], lines_v[0]]
         '''
-        lines_v = [(gtline, (255,0,0)), [mapline, (0,0,255)]]
+        lines_v = [(gtline, (255,0,0)), (mapline, (0,0,255)), (mapline2, (0, 255, 0))]
 
         images[i, :, :, :] = write_text_on_image(images[i, :, :, :],
                                                  showing_str,

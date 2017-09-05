@@ -1092,9 +1092,22 @@ def continous_MAP_car_loc_xy_custom(logits):
 def continous_MAP_car_loc_xy_datadriven(logits):
     return continous_MAP_car_loc_xy_custom(logits)
 
-def continous_MAP(logits):
+def continous_MAP(logits, return_second_best=False):
     func = globals()["continous_MAP_%s_%s" %
                      (FLAGS.sub_arch_selection, FLAGS.discretize_bin_type)]
+    if return_second_best:
+        logits = copy.deepcopy(logits)
+        logits = [np.array(logits[0])]
+        n = int(FLAGS.discretize_n_bins)
+        half = int(n / 2)
+
+        if n % 2 == 0:
+            lb = half - 1
+            ub = half + 1
+            logits[0][:, lb:ub] = -99999
+        else:
+            # using n/2 will have a bug
+            logits[0][:, half] = -99999
     return func(logits)
 
 ########################Custom learning rates##########################
