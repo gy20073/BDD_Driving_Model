@@ -375,7 +375,8 @@ def draw_sector(image,
                 speed_multiplier = 5,
                 h=360, w=640,
                 max_speed=30,
-                uniform_speed=False):
+                uniform_speed=False,
+                consistent_vis=(False, 1e-3, 1e2)):
     course_samples = np.arange(-math.pi / 2-course_delta,
                                math.pi / 2+course_delta,
                                course_delta)
@@ -410,8 +411,20 @@ def draw_sector(image,
     green_portion = 1
     # adaptively scale the densities
     total = course_pdf[icourse]*speed_pdf[ispeed]
-    total_max = np.amax(total)
-    total = total / total_max * 255*green_portion
+    if consistent_vis[0] == False:
+        total_max = np.amax(total)
+        total = total / total_max * 255*green_portion
+    else:
+        # consistent visualization between methods
+        MIN = consistent_vis[1]
+        MAX = consistent_vis[2]
+        total = np.maximum(MIN, total)
+        total = np.minimum(MAX, total)
+        #total = np.log(total) # map to log(MIN) to log(MAX)
+        #total = (total -np.log(MIN)) / (np.log(MAX) - np.log(MIN)) * 255
+        total = (total - MIN) / (MAX - MIN)
+        total = np.sqrt(total)
+        total = total * 255
 
     # assign to image
     image[xy[:, 1], xy[:, 0], :] *= (1-green_portion)
@@ -510,7 +523,8 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
                     pdf_multiplier=255*10,
                     speed_multiplier=int(wi/30/3),
                     h=hi, w=wi,
-                    uniform_speed=True)
+                    uniform_speed=True,
+                    consistent_vis=(True, 1e-5, 3.0))
 
         # disable the MAP line first, since many times not the MAP line is considered
         '''
