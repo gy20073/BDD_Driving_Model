@@ -478,6 +478,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
     images = images.astype('float64')
     _, hi, wi, _ = images.shape
     locs = locs[j, :, :]
+    locs = copy.deepcopy(locs)
 
     for i in range(images.shape[0]):
         # the ground truth course and speed

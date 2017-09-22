@@ -89,6 +89,13 @@ tf.app.flags.DEFINE_boolean('use_data_augmentation', False, 'whether to augment 
 tf.app.flags.DEFINE_integer('retain_first_k_training_example', -1,
                             'retrain the first k training example if >0 ')
 
+tf.app.flags.DEFINE_boolean('use_speed_yaw', False,
+                            'By default, the TFRecord gives a set of speeds in x, y coordinates. If True, we instead '
+                            'directly stores the speed and yaw rate in the TFRecord. ')
+tf.app.flags.DEFINE_boolean('is_MKZ_dataset', False,
+                            'The newly collected data on the Lincoln MKZ')
+
+
 
 # the newly designed class has to have those methods
 # especially the reader() that reads the binary record and the
@@ -110,6 +117,10 @@ class MyDataset(Dataset):
             if FLAGS.retain_first_k_training_example > 0:
                 return FLAGS.retain_first_k_training_example
 
+            if FLAGS.is_MKZ_dataset:
+                print("using the MKZ dataset")
+                return 40
+
             if FLAGS.low_res:
                 # TODO: change to these names
                 if FLAGS.train_filename == 'train_small.txt':
@@ -127,6 +138,10 @@ class MyDataset(Dataset):
             else:
                 return 28738
         if self.subset == 'validation':
+            if FLAGS.is_MKZ_dataset:
+                print("using the MKZ dataset")
+                return 9
+
             if FLAGS.low_res:
                 return 12877
             elif FLAGS.is_small_side_info_dataset:
@@ -678,6 +693,10 @@ class MyDataset(Dataset):
             feature_map.update({'image/segmentation': tf.VarLenFeature(dtype=tf.string),
                                 'image/context': tf.VarLenFeature(dtype=tf.string)})
 
+        if FLAGS.use_speed_yaw:
+            feature_map.update({'sensor/yaw_imu': tf.VarLenFeature(dtype=tf.float32),
+                                'sensor/speed_steer': tf.VarLenFeature(dtype=tf.float32)})
+
         features = tf.parse_single_example(example_serialized, feature_map)
 
         # if the data is downsampled by a temporal factor, the starting point should be random, such that we could use
@@ -740,13 +759,32 @@ class MyDataset(Dataset):
                                [tf.float32])[0]  #TODO(lowres)
         turn.set_shape([len_downsampled, self.naction])
 
-        # get the relative future location
-        # Note that we again abuse the notation a little bit, reusing stop_future_frames
-        # TODO: normalize the course and speed by time
-        locs = tf.py_func(self.relative_future_course_speed,
-                          [speed, FLAGS.stop_future_frames, FLAGS.frame_rate / FLAGS.temporal_downsample_factor],
-                          [tf.float32])[0]
-        locs.set_shape([len_downsampled, 2])
+
+        if FLAGS.use_speed_yaw:
+            yaw = features['sensor/yaw_imu'].values
+            spd = features['sensor/speed_steer'].values
+            ys = tf.pack([yaw, spd], axis=1, name="stack_yaw_speed")
+            # Now the shape is N*2
+            ys = ys[tstart : FLAGS.FRAMES_IN_SEG : FLAGS.temporal_downsample_factor, :]
+            ys.set_shape([len_downsampled, 2])
+
+            # compute locs from ys
+            ys = tf.pad(  ys,
+                          [[0, FLAGS.stop_future_frames], [0, 0]],
+                          mode="SYMMETRIC",
+                          name="pad_afterwards")
+            ys = ys[FLAGS.stop_future_frames:, :]
+            ys.set_shape([len_downsampled, 2])
+            locs = ys
+            print("data loader is using raw yaw and speed")
+        else:
+            # get the relative future location
+            # Note that we again abuse the notation a little bit, reusing stop_future_frames
+            # TODO: normalize the course and speed by time
+            locs = tf.py_func(self.relative_future_course_speed,
+                              [speed, FLAGS.stop_future_frames, FLAGS.frame_rate / FLAGS.temporal_downsample_factor],
+                              [tf.float32])[0]
+            locs.set_shape([len_downsampled, 2])
 
 
         # batching one 10 second segments into several smaller segments
