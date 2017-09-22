@@ -648,7 +648,7 @@ def samples_to_bins(samples, nbins, minwidth):
 def get_bins_datadriven():
     global datadriven_bins_cache
     if datadriven_bins_cache is not None:
-        return datadriven_bins_cache
+        return copy.deepcopy(datadriven_bins_cache)
 
     # default should be 181
     nbins = FLAGS.discretize_n_bins - 1
@@ -1087,14 +1087,27 @@ def continous_MAP_car_loc_xy_custom(logits):
     small_angle = 0.3/180*math.pi
     inters[0][-small_angle < inters[0] < small_angle] = 0.0
 
-    return np.stack(inters, axis=1)
+    return np.stack(inters, axis=1) # will return a #samples * 2 array
 
 def continous_MAP_car_loc_xy_datadriven(logits):
     return continous_MAP_car_loc_xy_custom(logits)
 
-def continous_MAP(logits):
+def continous_MAP(logits, return_second_best=False):
     func = globals()["continous_MAP_%s_%s" %
                      (FLAGS.sub_arch_selection, FLAGS.discretize_bin_type)]
+    if return_second_best:
+        logits = copy.deepcopy(logits)
+        logits = [np.array(logits[0])]
+        n = int(FLAGS.discretize_n_bins)
+        half = int(n / 2)
+
+        if n % 2 == 0:
+            lb = half - 1
+            ub = half + 1
+            logits[0][:, lb:ub] = -99999
+        else:
+            # using n/2 will have a bug
+            logits[0][:, half] = -99999
     return func(logits)
 
 ########################Custom learning rates##########################

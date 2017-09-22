@@ -113,9 +113,9 @@ def write_text_on_image(image, string,
         draw.text((0, 0), string, (255, 0, 0), font=font)
 
     for line in lines:
-        draw.line(line, fill=128, width=3)
+        draw.line(line, fill=128, width=1)
     for line in lines_color:
-        draw.line(line[0], fill=line[1], width=3)
+        draw.line(line[0], fill=line[1], width=1)
 
     return np.array(j)
 
@@ -375,7 +375,8 @@ def draw_sector(image,
                 speed_multiplier = 5,
                 h=360, w=640,
                 max_speed=30,
-                uniform_speed=False):
+                uniform_speed=False,
+                consistent_vis=(False, 1e-3, 1e2)):
     course_samples = np.arange(-math.pi / 2-course_delta,
                                math.pi / 2+course_delta,
                                course_delta)
@@ -410,8 +411,20 @@ def draw_sector(image,
     green_portion = 1
     # adaptively scale the densities
     total = course_pdf[icourse]*speed_pdf[ispeed]
-    total_max = np.amax(total)
-    total = total / total_max * 255*green_portion
+    if consistent_vis[0] == False:
+        total_max = np.amax(total)
+        total = total / total_max * 255*green_portion
+    else:
+        # consistent visualization between methods
+        MIN = consistent_vis[1]
+        MAX = consistent_vis[2]
+        total = np.maximum(MIN, total)
+        total = np.minimum(MAX, total)
+        #total = np.log(total) # map to log(MIN) to log(MAX)
+        #total = (total -np.log(MIN)) / (np.log(MAX) - np.log(MIN)) * 255
+        total = (total - MIN) / (MAX - MIN)
+        total = np.sqrt(total)
+        total = total * 255
 
     # assign to image
     image[xy[:, 1], xy[:, 0], :] *= (1-green_portion)
@@ -489,6 +502,12 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         map[1] = 10.0
         mapline = move_to_line(map, hi, wi, 10)
 
+        # get map2
+        map2 = car_stop_model.continous_MAP([predict[i:(i + 1), :]], return_second_best=True)
+        map2 = map2.ravel()
+        map2[1] = 10.0
+        mapline2 = move_to_line(map2, hi, wi, 10)
+
         showing_str = [
             [(0, 0), "driver's  angular speed: %.2f degree/s" % (locs[i, 0] / math.pi * 180), (255, 0, 0)],
             [(0, 20), "predicted angular speed: %.2f degree/s" % (map[0] / math.pi * 180), (0, 0, 255)]]
@@ -503,9 +522,10 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
                     course_delta=0.1 / 180 * math.pi,
                     speed_delta=0.1,
                     pdf_multiplier=255*10,
-                    speed_multiplier=int(wi/30/3/1.6),
+                    speed_multiplier=int(wi/30/3),
                     h=hi, w=wi,
-                    uniform_speed=True)
+                    uniform_speed=True,
+                    consistent_vis=(True, 1e-5, 3.0))
 
         # disable the MAP line first, since many times not the MAP line is considered
         '''
@@ -514,7 +534,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         if locs[i, 1] < map.ravel()[1]:
             lines_v = [lines_v[1], lines_v[0]]
         '''
-        lines_v = [(gtline, (255,0,0))]
+        lines_v = [(gtline, (255,0,0)), (mapline, (0,0,255)), (mapline2, (0, 255, 0))]
 
         images[i, :, :, :] = write_text_on_image(images[i, :, :, :],
                                                  showing_str,
