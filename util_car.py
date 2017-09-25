@@ -46,7 +46,7 @@ def images2video_highqual(frame_rate,
     return os.path.join(dir_name, video_name)
 
 def images2video(images, frame_rate,
-                 name="temp_name", dir_name="temp_dir"):
+                 name="temp_name", dir_name="temp_dir", highquality=True):
     images = np.uint8(images)
     shape = images.shape
     assert (len(shape) == 4)
@@ -62,11 +62,13 @@ def images2video(images, frame_rate,
     print("writing images")
     for i in range(shape[0]):
         j = Image.fromarray(images[i, :, :, :])
-        j.save("%05d.jpeg" % i, "jpeg")
+        j.save("%05d.jpeg" % i, "jpeg", quality=93)
 
     print("converting to video")
     video_name = name+'.mp4'
-    cmd = "ffmpeg -y -f image2 -r " + str(frame_rate) + " -pattern_type glob -i '*.jpeg' -crf 28 -preset veryfast " + \
+
+    quality_str = '16' if highquality else '28'
+    cmd = "ffmpeg -y -f image2 -r " + str(frame_rate) + " -pattern_type glob -i '*.jpeg' -crf "+quality_str+" -preset veryfast " + \
           "-threads 16 -vcodec libx264 " + video_name
     call(cmd, shell=True)
 
@@ -513,8 +515,15 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
             [(0, 20), "predicted angular speed: %.2f degree/s" % (map[0] / math.pi * 180), (0, 0, 255)]]
         # disable the small str on top first
         showing_str = ""
+        showing_str = "speed: %.1f m/s \ncourse: %.2f degree/s" % \
+                      (locs[i, 1], locs[i, 0] / math.pi * 180)
 
         gtline = move_to_line(locs[i, :], hi, wi, 10)
+
+        if FLAGS.is_MKZ_dataset:
+            higher_bound = 0.3
+        else:
+            higher_bound = 3.0
 
         images[i, :, :, :] = draw_sector(images[i, :, :, :],
                     predict[i:(i+1), :],
@@ -525,7 +534,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
                     speed_multiplier=int(wi/30/3),
                     h=hi, w=wi,
                     uniform_speed=True,
-                    consistent_vis=(True, 1e-5, 3.0))
+                    consistent_vis=(True, 1e-5, higher_bound))
 
         # disable the MAP line first, since many times not the MAP line is considered
         '''

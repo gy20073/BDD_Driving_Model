@@ -383,6 +383,14 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
                               isample,
                               True,
                               os.path.join(FLAGS.eval_dir, "viz"))
+
+        # save the logits to a file
+        names = tin_out_v[2]
+        _, short_name = os.path.split(names[isample])
+        short_name = short_name.split(".")[0]
+        npz_filename = os.path.join(FLAGS.eval_dir, "viz", short_name + ".logit.npz")
+        pickle.dump(logits_v, open(npz_filename, 'wb'))
+
     else:
       loss_v, labels_v, logits_v = sess.run([loss_op, labels, logits])
     if step == 0:
@@ -392,6 +400,7 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
       logits_all = np.concatenate((logits_all, logits_v), axis=0)
       labels_all = np.concatenate((labels_all, labels_v), axis=0)
     total_loss = total_loss + loss_v[0]
+
 
     if step % 20 == 19:
       duration = time.time() - start_time
