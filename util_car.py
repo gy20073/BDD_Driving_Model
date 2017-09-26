@@ -524,6 +524,7 @@ def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
         gtline = move_to_line(locs[i, :], hi, wi, 10)
 
         if FLAGS.is_MKZ_dataset:
+            # might be problematic since we enable the normalization
             higher_bound = 0.3
         else:
             higher_bound = 3.0

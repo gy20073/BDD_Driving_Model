@@ -871,7 +871,7 @@ def course_speed_to_joint_bin(labels):
     l = len(course)
 
     # follow the convention of speed first and speed second
-    out = np.zeros((l, n, n))
+    out = np.zeros((l, n, n), dtype=np.float32)
 
     for i, item in enumerate(zip(course, speed)):
         ci, si = item
@@ -897,7 +897,7 @@ def loss_car_joint(logits, net_outputs, batch_size=None):
 
     dense_labels = tf.py_func(course_speed_to_joint_bin,
                               [future_labels],
-                              [tf.float32])
+                              [tf.float32])[0]
 
     if FLAGS.class_balance_path!="":
         path = FLAGS.class_balance_path + "_joint.npy"
@@ -1044,6 +1044,7 @@ def continous_pdf_car_joint(logits, labels):
     speed_bin = [0] + speed_bin + [FLAGS.discretize_bound_speed]
 
     out = []
+    labels = labels[0]
     for i in range(labels.shape[0]):
         this = pdf_bins_batch_2D([course_bin, speed_bin], softmaxed[i, :], labels[i:(i+1),:])
         out.append(this)
