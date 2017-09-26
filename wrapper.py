@@ -98,7 +98,7 @@ class Wrapper:
         return imresize(image, (IMSZ, IMSZ))
 
     def continuous_muti_querys_pdf(self, logits, querys):
-        return model.multi_querys_car_loc_xy(logits, querys)
+        return model.continous_pdf(logits, querys, "multi_querys")
 
     def continuous_MAP(self, logits):
         return model.continous_MAP(logits)

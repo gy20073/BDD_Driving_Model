@@ -16,6 +16,7 @@ import scipy.ndimage
 from collections import defaultdict
 import models.BasicConvLSTMCell as BasicConvLSTMCell
 import os
+from scipy.ndimage import gaussian_filter
 
 # base CNNs
 from models.kaffe.caffenet import CaffeNet
@@ -739,6 +740,18 @@ def get_bins_custom():
 
     return list(course_bin), list(speed_bin)
 
+def get_bins_joint():
+    course_bin = np.array([0.5, 1.5, 2.5, 4, 6, 9, 13, 18, 24, 31, 39, 48, 58, 69])
+    course_bin = np.concatenate((-course_bin[::-1], [0], course_bin))
+    course_bin = list(course_bin / 180 * math.pi)
+
+    speed_bin = [0.1, 0.5] + list(range(1, 28))
+
+    # to be compatible with code before, assume we have 29 numbers for each, discritize n bins=30
+    assert(len(course_bin) == len(speed_bin))
+    assert (len(course_bin) == (FLAGS.discretize_n_bins-1))
+    return course_bin, speed_bin
+
 # convert the labels to bins
 def course_speed_to_discrete(labels):
     course = labels[:, 0]
@@ -850,11 +863,30 @@ def city_loss(city_prediction, seg_mask):
                              weight=FLAGS.ptrain_weight)
 ##################### Loss Functions of the jointly discritized #########
 def course_speed_to_joint_bin(labels):
-    pass
+    # each of the labels[i, :] is the course and speed
+    # convert each pair to the corresponding bin location
+    course, speed = course_speed_to_discrete(labels)
 
-# TODO: continuous label to bins and smoothed
-# TODO: continous_pdf_car_loc_xy, multi_query_car_loc_xy
-# TODO: continous_MAP_car_loc_xy
+    n = FLAGS.discretize_n_bins
+    l = len(course)
+
+    # follow the convention of speed first and speed second
+    out = np.zeros((l, n, n))
+
+    for i, item in enumerate(zip(course, speed)):
+        ci, si = item
+        out[i, ci, si] = 1.0
+
+        # do the gaussian smoothing
+        out[i, :, :] = gaussian_filter(out[i, :, :],
+                        sigma=FLAGS.discretize_label_gaussian_sigma,
+                        mode='constant', cval=0.0)
+    # renormalization of the distribution
+    out = out / np.sum(out, axis=(1,2), keepdims=True)
+
+    out = np.reshape(out, [l, n*n])
+    return out
+
 
 def loss_car_joint(logits, net_outputs, batch_size=None):
     # net_outputs contains is_stop, turn, locs
@@ -880,7 +912,9 @@ def loss_car_joint(logits, net_outputs, batch_size=None):
         masks = 1.0
 
     future_predict = logits[0]
-    slim.losses.softmax_cross_entropy(future_predict, dense_labels, weight=masks)
+    slim.losses.softmax_cross_entropy(future_predict, dense_labels,
+                                      weight=masks,
+                                      scope="softmax_loss_joint")
 
 def loss(logits, net_outputs, batch_size=None):
     if FLAGS.city_data:
@@ -896,6 +930,7 @@ def loss(logits, net_outputs, batch_size=None):
     
 
 ####################pdf of continous distribution #######################
+# only used in continous_pdf_car_loc_xy
 def pdf_bins(bins, prob, query):
     # bins has n+1 numbers
     # probs has n probs that sum to 1
@@ -918,25 +953,52 @@ def pdf_bins(bins, prob, query):
             else:
                 return prob[i]
 
+
 def pdf_bins_batch(bins, prob, querys):
     assert (len(bins) == len(prob) + 1)
 
     querys = np.array(querys)
-    querys[querys<bins[0]]  = bins[0]
-    querys[querys>bins[-1]] = bins[-1]
-    # assert the querys are sorted
-    out=np.zeros_like(querys)
-    start = 0
-    for i in range(len(querys)):
-        q = querys[i]
-        while (start+1<len(bins)) and (q>bins[start+1]):
-            start += 1
-        if FLAGS.pdf_normalize_bins:
-            out[i] = prob[start] / (bins[start+1]-bins[start])
-        else:
-            out[i] = prob[start]
-    return out
+    idx = np.digitize(querys, bins[1:-1])
 
+    # get the mass
+    masses = prob[idx]
+
+    if FLAGS.pdf_normalize_bins:
+        # get the x bin length
+        xlen = bins[idx + 1] - bins[idx]
+        return masses / xlen
+    else:
+        return masses
+
+
+
+def pdf_bins_batch_2D(cs_bins, prob, querys):
+    # assume the input cs_bins are augmented with the bounds
+    cbin, sbin = cs_bins
+    cbin = np.array(cbin)
+    sbin = np.array(sbin)
+
+    assert(len(cbin) == len(sbin))
+    prob = np.reshape(prob, (len(cbin)-1, len(cbin)-1))
+
+    querys = np.array(querys)
+    cidx = np.digitize(querys[:, 0], cbin[1:-1])
+    sidx = np.digitize(querys[:, 1], sbin[1:-1])
+
+    # get the mass
+    masses = prob[cidx, sidx]
+
+    if FLAGS.pdf_normalize_bins:
+        # get the x bin length
+        xlen = cbin[cidx + 1] - cbin[cidx]
+        ylen = sbin[sidx + 1] - sbin[sidx]
+
+        return masses / (xlen*ylen)
+    else:
+        return masses
+
+
+# this is called from continous_pdf function
 def continous_pdf_car_loc_xy(logits, labels):
     # the first entry is the predicted logits
     # first part is course and second part is speed
@@ -971,7 +1033,29 @@ def continous_pdf_car_loc_xy(logits, labels):
     # return the log prob of each speed and course
     return out
 
-def multi_querys_car_loc_xy(logits, querys):
+def continous_pdf_car_joint(logits, labels):
+    logits = logits[0]
+    softmaxed = util_car.softmax(logits)
+
+    # get the bins
+    course_bin, speed_bin = get_bins()
+    course_bin = [-FLAGS.discretize_bound_angle] + course_bin + \
+                 [FLAGS.discretize_bound_angle]
+    speed_bin = [0] + speed_bin + [FLAGS.discretize_bound_speed]
+
+    out = []
+    for i in range(labels.shape[0]):
+        this = pdf_bins_batch_2D([course_bin, speed_bin], softmaxed[i, :], labels[i:(i+1),:])
+        out.append(this)
+    out = np.array(out)
+    out = np.log(out + FLAGS.discretize_min_prob)
+
+    # return the log prob, Note that this output is not compatible any more
+    return out
+
+
+# used in the wrapper and draw_sector
+def multi_querys_car_loc_xy_impl(logits, querys):
     # the first entry is the predicted logits
     # first part is course and second part is speed
     logits = logits[0]
@@ -997,6 +1081,30 @@ def multi_querys_car_loc_xy(logits, querys):
 
     # return the log prob of each speed and course
     return [course_querys, speed_querys]
+
+
+def multi_querys_car_loc_xy(logits, querys):
+    querys = np.array(querys)
+    course_querys, speed_querys = \
+        multi_querys_car_loc_xy_impl(logits, [querys[:, 0], querys[:, 1]])
+    return course_querys * speed_querys
+
+
+# change the definition of this function to input a list of (c, s) pairs
+def multi_query_car_joint(logits, querys):
+    logits = logits[0]
+    softmaxed = util_car.softmax(logits)
+
+    # get the bins
+    course_bin, speed_bin = get_bins()
+    course_bin = [-FLAGS.discretize_bound_angle] + course_bin + \
+                 [FLAGS.discretize_bound_angle]
+    speed_bin = [0] + speed_bin + [FLAGS.discretize_bound_speed]
+
+    out = pdf_bins_batch_2D([course_bin, speed_bin], softmaxed[0, :], querys)
+
+    return out
+
 
 def continous_pdf(logits, labels, prefix="continous_pdf"):
     # logits are the list of logit outputed by the network
@@ -1062,27 +1170,33 @@ def continous_MAP_car_loc_xy_linear(logits):
         inters.append(inter)
     return np.stack(inters, axis=1)
 
+def MAP_custom_bin_helper(predicted_cs_argmax):
+    # return the interpolated values, course and speed could be distribution
+    cs_bins = get_bins()
+
+    inters = []
+    # for in range and speed
+    appends = [89.9 / 180 * math.pi, 29.99]
+    prepend = [-89.9 / 180 * math.pi, 0.001]
+    for i in range(2):
+        predicted = predicted_cs_argmax[i]
+
+        bins = cs_bins[i]
+        bins.append(appends[i])
+        bins = np.array(bins)
+
+        bins = np.insert(bins, 0, prepend[i])
+        inter = (bins[predicted + 1] + bins[predicted]) / 2.0
+        inters.append(inter)
+    return inters
+
 def continous_MAP_car_loc_xy_custom(logits):
     logits = logits[0]
     n = FLAGS.discretize_n_bins
     predicts = [logits[:, 0:n], logits[:, n: ]]
 
-    # return the interpolated values, course and speed could be distribution
-    cs_bins = get_bins()
-
-    inters=[]
-    # for in range and speed
-    appends=[89.9/180*math.pi, 29.99]
-    prepend=[-89.9/180*math.pi, 0.001]
-    for i in range(2):
-        bins = cs_bins[i]
-        bins.append(appends[i])
-        bins = np.array(bins)
-
-        predicted = np.argmax(predicts[i], axis=1)
-        bins = np.insert(bins, 0, prepend[i])
-        inter = (bins[predicted+1] + bins[predicted]) / 2.0
-        inters.append(inter)
+    predicted_cs_argmax = [np.argmax(predicts[0], axis=1), np.argmax(predicts[1], axis=1)]
+    inters = MAP_custom_bin_helper(predicted_cs_argmax)
 
     small_angle = 0.3/180*math.pi
     inters[0][-small_angle < inters[0] < small_angle] = 0.0
@@ -1092,10 +1206,20 @@ def continous_MAP_car_loc_xy_custom(logits):
 def continous_MAP_car_loc_xy_datadriven(logits):
     return continous_MAP_car_loc_xy_custom(logits)
 
+def continous_MAP_car_joint_joint(logits):
+    logits = logits[0]
+    n = int(FLAGS.discretize_n_bins)
+
+    argm = np.argmax(logits, axis=1)
+    predicted_cs_argmax = [(argm / n).astype(int), (argm % n).astype(int)]
+    inters = MAP_custom_bin_helper(predicted_cs_argmax)
+
+    return np.stack(inters, axis=1)  # will return a #samples * 2 array
+
 def continous_MAP(logits, return_second_best=False):
     func = globals()["continous_MAP_%s_%s" %
                      (FLAGS.sub_arch_selection, FLAGS.discretize_bin_type)]
-    if return_second_best:
+    if return_second_best and FLAGS.discretize_bin_type!="joint":
         logits = copy.deepcopy(logits)
         logits = [np.array(logits[0])]
         n = int(FLAGS.discretize_n_bins)

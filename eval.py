@@ -422,15 +422,18 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
 
   summary = tf.Summary()
   summary.ParseFromString(sess.run(summary_op))
-  summary.value.add(tag='test_loglike/course', simple_value=np.asscalar(meanLikes[0]))
-  update_best_error(-np.asscalar(meanLikes[0]))
 
-  summary.value.add(tag='test_loglike/speed', simple_value=np.asscalar(meanLikes[1]))
+  # Warning, now the best metric becomes the average likelihoods, instead of the angular likelihoods
+  update_best_error(-np.asscalar(np.mean(meanLikes)))
+
+  if FLAGS.sub_arch_selection == "car_loc_xy":
+    summary.value.add(tag='test_loglike/course', simple_value=np.asscalar(meanLikes[0]))
+    summary.value.add(tag='test_loglike/speed', simple_value=np.asscalar(meanLikes[1]))
+    print("log(likihoods): course=%f, speed=%f" % (meanLikes[0], meanLikes[1]), end='')
+
   summary.value.add(tag='test_loglike/total', simple_value=np.asscalar(np.mean(meanLikes)))
   summary.value.add(tag='test_loss_biased', simple_value=total_loss)
-
-  print("cross entropy=%f, log(likelihoods): course=%f, speed=%f, total=%f"
-          % (total_loss, meanLikes[0], meanLikes[1], np.mean(meanLikes)))
+  print("cross entropy=%f, log(likelihoods): total=%f" % (total_loss, np.mean(meanLikes)))
 
   return summary
 

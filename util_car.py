@@ -368,6 +368,9 @@ def vis_discrete_simplified(tout, predict, frame_rate,
     else:
         return visualize_images(images, frame_rate)
 
+def generate_meshlist(arange1, arange2):
+    return np.dstack(np.meshgrid(arange1, arange2, indexing='ij')).reshape((-1,2))
+
 def draw_sector(image,
                 predict,
                 car_stop_model,
@@ -383,17 +386,17 @@ def draw_sector(image,
                                math.pi / 2+course_delta,
                                course_delta)
     speed_samples = np.arange(0, max_speed+speed_delta, speed_delta)
-    course_pdf, speed_pdf = car_stop_model.continous_pdf([predict],
-                                                [course_samples, speed_samples],
+    total_pdf = car_stop_model.continous_pdf([predict],
+                                                generate_meshlist(course_samples, speed_samples),
                                                 "multi_querys")
+    total_pdf = np.reshape(total_pdf, (len(course_samples), len(speed_samples)))
     if uniform_speed:
-        speed_pdf[:] = 1.0
+        total_pdf = total_pdf / np.sum(total_pdf, axis=0, keepdims=True)
 
     speed_scaled = max_speed * speed_multiplier
     # potential xy positions to be filled
-    xy = np.dstack(np.meshgrid(np.arange(w / 2 - speed_scaled, w / 2 + speed_scaled),
-                               np.arange(h-speed_scaled, h),
-                               indexing='ij')).reshape((-1,2))
+    xy = generate_meshlist(np.arange(w / 2 - speed_scaled, w / 2 + speed_scaled),
+                           np.arange(h - speed_scaled, h))
 
     # filter out invalid speed
     v=np.stack((xy[:,0]-w/2, h-xy[:,1]), axis=1)
@@ -411,8 +414,8 @@ def draw_sector(image,
     ispeed = np.searchsorted(speed_samples, speed_norm)
 
     green_portion = 1
-    # adaptively scale the densities
-    total = course_pdf[icourse]*speed_pdf[ispeed]
+    total = total_pdf[icourse, ispeed]
+
     if consistent_vis[0] == False:
         total_max = np.amax(total)
         total = total / total_max * 255*green_portion
