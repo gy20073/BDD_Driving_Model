@@ -1092,7 +1092,7 @@ def multi_querys_car_loc_xy(logits, querys):
 
 
 # change the definition of this function to input a list of (c, s) pairs
-def multi_query_car_joint(logits, querys):
+def multi_querys_car_joint(logits, querys):
     logits = logits[0]
     softmaxed = util_car.softmax(logits)
 

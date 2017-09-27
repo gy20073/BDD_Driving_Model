@@ -375,7 +375,8 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
         if FLAGS.use_simplifed_continuous_vis:
             vis_func = util_car.vis_continuous_interpolated
         else:
-            vis_func = util_car.vis_continuous_simplified    # The too complicated is not readable
+            # vis_func = util_car.vis_continuous_simplified    # The too complicated is not readable
+            vis_func = util_car.vis_continuous
         vis_func(tin_out_v,
                               logits_v,
                               15 / FLAGS.temporal_downsample_factor,
