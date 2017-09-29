@@ -731,6 +731,7 @@ class MyDataset(Dataset):
                 ctx_decoded  = tf.py_func(self.read_array,[ctx],[tf.float32])[0]
                 ctx_decoded.set_shape([len_downsampled, ctx_channel, ctx_height, ctx_width])
 
+        decoded_raw = decoded
         if FLAGS.resize_images != "":
             # should have format: new_height, new_width
             sp_size = FLAGS.resize_images.split(",")
@@ -790,7 +791,11 @@ class MyDataset(Dataset):
         # batching one 10 second segments into several smaller segments
         batching_inputs = [decoded, speed, stop_label, turn, locs]
         if FLAGS.only_seg == 1:
-            batching_inputs += [seg_decoded, ctx_decoded]        
+            batching_inputs += [seg_decoded, ctx_decoded]
+            decoded_raw_loc = 7
+        else:
+            decoded_raw_loc = 5
+        batching_inputs += [decoded_raw]
         batched = [self.batching(x, len_downsampled) for x in batching_inputs]
 
         name = tf.tile(name, [batched[0].get_shape()[0].value])
@@ -833,6 +838,10 @@ class MyDataset(Dataset):
         if FLAGS.only_seg == 1:
             ins = ins + batched[5:7]
             outs = outs
+
+        # adding the raw images
+        ins += batched[decoded_raw_loc:(decoded_raw_loc+1)]
+
         # dropout non-stop videos
         if FLAGS.balance_drop_prob > 0:
             retained = tf.py_func(self.no_stop_dropout_valid,

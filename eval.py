@@ -65,6 +65,10 @@ tf.app.flags.DEFINE_boolean('imagenet_offset', False,
 
 tf.app.flags.DEFINE_boolean('use_simplifed_continuous_vis', False,
                             """use a simplified version of visualization""")
+tf.app.flags.DEFINE_string('vis_func', "",
+                            """When not empty, use this visualization function,
+                            this overrides use_simplifed_continuous_vis""")
+
 tf.app.flags.DEFINE_float('sleep_per_iteration', -1.0,
                           '''how long to sleep per iteration, use when fastest evaluation is not necessary''')
 tf.app.flags.DEFINE_boolean('save_best_model', False,
@@ -372,11 +376,15 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
     if FLAGS.output_visualizations:
       loss_v, labels_v, logits_v, tin_out_v = sess.run([loss_op, labels, logits, tensors_in + labels_in])
       for isample in range(FLAGS.batch_size):
-        if FLAGS.use_simplifed_continuous_vis:
-            vis_func = util_car.vis_continuous_interpolated
+
+        if FLAGS.vis_func == "":
+          if FLAGS.use_simplifed_continuous_vis:
+              vis_func = util_car.vis_continuous_interpolated
+          else:
+              # vis_func = util_car.vis_continuous_simplified    # The too complicated is not readable
+              vis_func = util_car.vis_continuous
         else:
-            # vis_func = util_car.vis_continuous_simplified    # The too complicated is not readable
-            vis_func = util_car.vis_continuous
+          vis_func = getattr(util_car, FLAGS.vis_func)
         vis_func(tin_out_v,
                               logits_v,
                               15 / FLAGS.temporal_downsample_factor,

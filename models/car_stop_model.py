@@ -958,6 +958,7 @@ def pdf_bins_batch(bins, prob, querys):
     assert (len(bins) == len(prob) + 1)
 
     querys = np.array(querys)
+    bins = np.array(bins)
     idx = np.digitize(querys, bins[1:-1])
 
     # get the mass

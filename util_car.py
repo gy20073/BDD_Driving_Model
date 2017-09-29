@@ -1,5 +1,5 @@
 from subprocess import call
-import os
+import os, time
 import shutil
 import io
 import base64
@@ -37,10 +37,10 @@ def images2video_highqual(frame_rate,
     print("converting to video")
     video_name = name+'.mp4'
     cmd = "ffmpeg -y -f image2 -r " + str(frame_rate) + " -pattern_type glob -i '*.png' -crf 5 -preset veryslow " + \
-          "-threads 16 -vcodec libx264 " + video_name
+          "-threads 16 -vcodec libx264  -pix_fmt yuv420p " + video_name
     call(cmd, shell=True)
 
-    #call("rm *.jpeg", shell=True)
+    call("rm *.png", shell=True)
     os.chdir(pwd)
 
     return os.path.join(dir_name, video_name)
@@ -69,7 +69,7 @@ def images2video(images, frame_rate,
 
     quality_str = '16' if highquality else '28'
     cmd = "ffmpeg -y -f image2 -r " + str(frame_rate) + " -pattern_type glob -i '*.jpeg' -crf "+quality_str+" -preset veryfast " + \
-          "-threads 16 -vcodec libx264 " + video_name
+          "-threads 16 -vcodec libx264  -pix_fmt yuv420p " + video_name
     call(cmd, shell=True)
 
     call("rm *.jpeg", shell=True)
@@ -213,7 +213,16 @@ def draw_bar_on_image(image, bar_left_top, fraction, fill=(0,0,0,128), height=20
 
 def vis_reader_stop_go(tout, prediction,frame_rate,  j=0, save_visualize = False, dir_name="temp", provider="nexar_large_speed"):
     #out_of_date, won't do stop go any more
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
+
     turn = turn[j, :, :]
     locs = locs[j, :, :]
 
@@ -251,18 +260,26 @@ def vis_discrete(tout, predict, frame_rate,
         decoded = tout[0]
         speed = tout[1]
         name = tout[2]
-        isstop = tout[4]
-        turn = tout[5]
-        locs = tout[6]
+        isstop = tout[5]
+        turn = tout[6]
+        locs = tout[7]
     elif FLAGS.only_seg == 1:
         decoded = tout[0]
         speed = tout[1]
         name = tout[2]
-        isstop = tout[5]
-        turn = tout[6]
-        locs = tout[7]
+        isstop = tout[6]
+        turn = tout[7]
+        locs = tout[8]
     else:
-        decoded, speed, name, isstop, turn, locs = tout
+        decoded = tout[0]
+        speed = tout[1]
+        name = tout[2]
+        highres = tout[3]
+
+        isstop = tout[4]
+        turn = tout[5]
+        locs = tout[6]
+        decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     _, hi, wi, _ = images.shape
@@ -319,7 +336,15 @@ def vis_discrete_simplified(tout, predict, frame_rate,
     import data_providers.nexar_large_speed as provider
     int2str = provider.MyDataset.turn_int2str
 
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     _, hi, wi, _ = images.shape
@@ -381,7 +406,8 @@ def draw_sector(image,
                 h=360, w=640,
                 max_speed=30,
                 uniform_speed=False,
-                consistent_vis=(False, 1e-3, 1e2)):
+                consistent_vis=(False, 1e-3, 1e2),
+                has_alpha_channel=False):
     course_samples = np.arange(-math.pi / 2-course_delta,
                                math.pi / 2+course_delta,
                                course_delta)
@@ -391,7 +417,7 @@ def draw_sector(image,
                                                 "multi_querys")
     total_pdf = np.reshape(total_pdf, (len(course_samples), len(speed_samples)))
     if uniform_speed:
-        total_pdf = total_pdf / np.sum(total_pdf, axis=0, keepdims=True)
+        total_pdf = total_pdf / np.sum(total_pdf, axis=1, keepdims=True)
 
     speed_scaled = max_speed * speed_multiplier
     # potential xy positions to be filled
@@ -434,12 +460,22 @@ def draw_sector(image,
     # assign to image
     image[xy[:, 1], xy[:, 0], :] *= (1-green_portion)
     image[xy[:, 1], xy[:, 0], 1] += total
+    if has_alpha_channel:
+        image[xy[:, 1], xy[:, 0], 3] = 255
 
     return image
 
 def vis_continuous(tout, predict, frame_rate, car_stop_model,
                  j=0, save_visualize=False, dir_name="temp", return_first=False, **kwargs):
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     images = images.astype('float64')
@@ -459,7 +495,8 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
                     speed_delta=0.1,
                     pdf_multiplier=255*10,
                     speed_multiplier=wi/30/3,
-                    h=hi, w=wi)
+                    h=hi, w=wi,
+                    consistent_vis=(True, 1e-5, 0.3))
         # get the MAP prediction
         map = car_stop_model.continous_MAP([predict[i:(i+1), :]])
         mapline = move_to_line(map.ravel(), hi, wi, 10)
@@ -490,7 +527,15 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
 
 def vis_continuous_simplified(tout, predict, frame_rate, car_stop_model,
                  j=0, save_visualize=False, dir_name="temp", vis_radius=10):
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     images = images.astype('float64')
@@ -628,11 +673,19 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
         decoded = tout[0]
         speed = tout[1]
         name = tout[2]
-        isstop = tout[5]
-        turn = tout[6]
-        locs = tout[7]
+        isstop = tout[6]
+        turn = tout[7]
+        locs = tout[8]
     else:
-        decoded, speed, name, isstop, turn, locs = tout
+        decoded = tout[0]
+        speed = tout[1]
+        name = tout[2]
+        highres = tout[3]
+
+        isstop = tout[4]
+        turn = tout[5]
+        locs = tout[6]
+        decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     _, hi, wi, _ = images.shape
@@ -745,7 +798,15 @@ def vis_discrete_colormap_antialias(tout, predict, frame_rate, j=0, save_visuali
 
 def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
                  j=0, save_visualize=False, dir_name="temp", vis_radius=10):
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
     #images = images.astype('float64')
@@ -842,7 +903,15 @@ def vis_continuous_colormap_antialias(tout, predict, frame_rate, car_stop_model,
 
 def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
                  j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True, return_first=False):
-    decoded, speed, name, isstop, turn, locs = tout
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
 
@@ -999,3 +1068,114 @@ def continuous_vis_single_image(image, logit, method="full"):
                  need_softmax=False, return_first=True)
 
     return image
+
+# improved version with various speed and yaw rate
+def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
+                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True, return_first=False):
+    decoded = tout[0]
+    speed = tout[1]
+    name = tout[2]
+    highres = tout[3]
+
+    isstop = tout[4]
+    turn = tout[5]
+    locs = tout[6]
+    decoded = highres
+
+    images = copy.deepcopy(decoded[j, :, :, :, :])
+
+    _, hi, wi, _ = images.shape
+    locs = locs[j, :, :]
+
+    def gen_mask(predict, radius, height, width, consistent_upper_bound=0.3):
+        image = np.zeros((height, width, 4), dtype=np.float64)
+        image = draw_sector(image,
+                    predict,
+                    car_stop_model,
+                    course_delta=0.1 / 180 * math.pi,
+                    speed_delta=0.1,
+                    pdf_multiplier=None,
+                    speed_multiplier=radius/30,
+                    h=height, w=width,
+                    max_speed=30,
+                    uniform_speed=False,
+                    consistent_vis=(True, 1e-3, consistent_upper_bound),
+                    has_alpha_channel=True)
+
+        return image.astype("uint8")
+
+    def plot_line(ada, driver_action, driver_speed, image_height, radius, color_driver="#0000FF"):
+        # convert the driver action to the language of matplotlib
+        driver_action = -driver_action * 180 / math.pi + 90
+        # then to radian again
+        driver_action = driver_action / 180.0 * math.pi
+
+        start = np.array([radius, -(image_height / 2 - radius / 2)])
+        delta = np.array([driver_speed * math.cos(driver_action), driver_speed * math.sin(driver_action)]) * 0.8
+        ada.drawing_area.add_artist(FancyArrowPatch(start, start + delta, linewidth=2, color=color_driver))
+
+    def plot_greens(predict, image_width, image_height, radius, locs, MAP, amplify_ratio):
+        ada = AnchoredDrawingArea(radius * 2, radius, 0, 0, loc=10, pad=0., borderpad=0., frameon=False)
+
+        def add_to_ada(ada, pos_x, pos_y, radius, angle_s, angle_e, ring_width, color_code, alpha_value):
+            ada.drawing_area.add_artist(
+                Wedge((pos_x, pos_y), radius, angle_s, angle_e, width=ring_width, fc=color_code  # '#DAF7A6'
+                      , ec='none', alpha=alpha_value, antialiased=True))
+
+        # TODO, replace this with a call to draw_sector
+        mask = gen_mask(predict, radius, image_height, image_width)
+        plt.imshow(mask, alpha=0.8)
+
+        white_border = 2
+        border_color = '#FFFFFF'
+        add_to_ada(ada, radius, -(image_height / 2 - radius / 2), radius + white_border, 0, 180, white_border + 1,
+                   border_color, 1)
+
+        plot_line(ada, locs[0], locs[1]*amplify_ratio, image_height, radius, "#0000FF")
+        plot_line(ada, MAP[0],  MAP[1]*amplify_ratio,  image_height, radius, "#FF0000")
+
+        return ada
+
+    _, short_name = os.path.split(name[j])
+    short_name = short_name.split(".")[0]
+    for i in range(images.shape[0]):
+        # TODO, might change based on machine
+        DPI = 72
+        fig = plt.figure(figsize=(1.0*wi / DPI, 1.0*hi / DPI), dpi=DPI)
+
+        #ax_original = plt.gca()
+        ax_original = fig.add_axes([0, 0, 1, 1])
+        ax_original.set_axis_off()
+        ax_original.get_xaxis().set_visible(False)
+        ax_original.get_yaxis().set_visible(False)
+        plt.imshow(images[i, :, :, :])
+        plt.axis('off')
+
+        assert need_softmax
+
+        radius = int(hi/2) / 30 * 30
+
+        # TODO: add the MAP prediction.
+        ada2 = plot_greens(predict[i:(i+1), :], wi, hi, radius,
+                           locs[i, :],
+                           car_stop_model.continous_MAP([predict[i:(i + 1), :]]).ravel(),
+                           radius / 30.0)
+        ax_original.add_artist(ada2)
+        #plt.show()
+
+        out_dir_name = dir_name
+        if not os.path.exists(out_dir_name):
+            os.makedirs(out_dir_name)
+        # This line take most of the time, because all the rendering happens here
+        fig.savefig(os.path.join(out_dir_name, '{0:05}.png'.format(i)),
+                    bbox_inches='tight', pad_inches=-0.1, Transparent=True, dpi=DPI)
+        plt.close()
+        print(short_name)
+
+    images2video_highqual(frame_rate=frame_rate, name=short_name, dir_name=dir_name)
+
+    print("showing visualization for video %s" % name[j])
+    if return_first:
+        path = os.path.join(dir_name, 'viz', name[0], '{0:04}.png'.format(0))
+        image = misc.imread(path, mode='RGB')
+        return image
