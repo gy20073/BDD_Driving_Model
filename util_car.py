@@ -1104,7 +1104,7 @@ def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
 
         return image.astype("uint8")
 
-    def plot_line(ada, driver_action, driver_speed, image_height, radius, color_driver="#0000FF"):
+    def plot_line(ada, driver_action, driver_speed, image_height, radius, color_driver="#0000FF", linewidth=2.0):
         # convert the driver action to the language of matplotlib
         driver_action = -driver_action * 180 / math.pi + 90
         # then to radian again
@@ -1112,7 +1112,7 @@ def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
 
         start = np.array([radius, -(image_height / 2 - radius / 2)])
         delta = np.array([driver_speed * math.cos(driver_action), driver_speed * math.sin(driver_action)]) * 0.8
-        ada.drawing_area.add_artist(FancyArrowPatch(start, start + delta, linewidth=2, color=color_driver))
+        ada.drawing_area.add_artist(FancyArrowPatch(start, start + delta, linewidth=linewidth, color=color_driver))
 
     def plot_greens(predict, image_width, image_height, radius, locs, MAP, amplify_ratio):
         ada = AnchoredDrawingArea(radius * 2, radius, 0, 0, loc=10, pad=0., borderpad=0., frameon=False)
@@ -1131,8 +1131,8 @@ def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
         add_to_ada(ada, radius, -(image_height / 2 - radius / 2), radius + white_border, 0, 180, white_border + 1,
                    border_color, 1)
 
-        plot_line(ada, locs[0], locs[1]*amplify_ratio, image_height, radius, "#0000FF")
-        plot_line(ada, MAP[0],  MAP[1]*amplify_ratio,  image_height, radius, "#FF0000")
+        plot_line(ada, locs[0], locs[1]*amplify_ratio, image_height, radius, "#FF0000", 1.0)
+        plot_line(ada, MAP[0],  MAP[1]*amplify_ratio,  image_height, radius, "#0000FF", 1.0)
 
         return ada
 

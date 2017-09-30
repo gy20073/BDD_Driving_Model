@@ -5,7 +5,7 @@ from __future__ import print_function
 from dataset import Dataset
 import tensorflow as tf
 import numpy as np
-import os
+import os, random
 import util
 import util_car
 import math
@@ -94,7 +94,8 @@ tf.app.flags.DEFINE_boolean('use_speed_yaw', False,
                             'directly stores the speed and yaw rate in the TFRecord. ')
 tf.app.flags.DEFINE_boolean('is_MKZ_dataset', False,
                             'The newly collected data on the Lincoln MKZ')
-
+tf.app.flags.DEFINE_boolean('use_non_random_shuffle', False,
+                            'Whether to shuffle the files')
 
 
 # the newly designed class has to have those methods
@@ -205,6 +206,10 @@ class MyDataset(Dataset):
         if FLAGS.retain_first_k_training_example > 0 and self.subset == "train":
             data_files = sorted(data_files)
             data_files = data_files[:FLAGS.retain_first_k_training_example]
+
+        if FLAGS.use_non_random_shuffle:
+            random.seed(a=1)
+            random.shuffle(data_files)
         return data_files
 
     def decode_jpeg(self, image_buffer, scope=None):

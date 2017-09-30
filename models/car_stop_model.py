@@ -1218,6 +1218,9 @@ def continous_MAP_car_joint_joint(logits):
 
     return np.stack(inters, axis=1)  # will return a #samples * 2 array
 
+
+# We should pick the largest density!!!
+# all of our implementation here is largest bin
 def continous_MAP(logits, return_second_best=False):
     func = globals()["continous_MAP_%s_%s" %
                      (FLAGS.sub_arch_selection, FLAGS.discretize_bin_type)]
