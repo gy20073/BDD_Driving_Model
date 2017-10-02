@@ -8,7 +8,7 @@ import util_car
 from util import activation_summaries
 import tensorflow.contrib.slim as slim
 from tensorflow.python.ops import init_ops
-import math
+import math, importlib, sys
 import numpy as np
 from util import *
 import copy
@@ -151,6 +151,12 @@ tf.app.flags.DEFINE_string('cnn_split', 'conv4',
                            'where we want to split for priviledged training')
 tf.app.flags.DEFINE_boolean('early_split', False, 'whether split the network in an early stage')
 tf.app.flags.DEFINE_boolean('image_downsample', False, 'downsample to 384, 216')
+
+tf.app.flags.DEFINE_string('prior_folder_path', '',
+                           'the turning / straight prior file path')
+tf.app.flags.DEFINE_string('prior_name', '',
+                           'filename.prior_name')
+
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -481,6 +487,20 @@ def LRCN(net_inputs, num_classes, for_training):
         if FLAGS.city_data:
             logits += [city_features]
 
+    # TODO: call the prior if available.
+    if FLAGS.prior_folder_path != '':
+        sys.path.append(FLAGS.prior_folder_path)
+        sp = FLAGS.prior_name.split(".")
+        assert (len(sp) == 2)
+        lib = importlib.import_module(sp[0])
+        func = getattr(lib, sp[1])
+
+        old_shape = logits[0].get_shape()
+        print(old_shape)
+        # call the function as a pyfunc
+        logits[0] = tf.py_func(func, [logits[0], FLAGS.sub_arch_selection], [tf.float32])[0]
+        # set shape
+        logits[0].set_shape(old_shape)
         
     return logits
     # The usage of logits from model.inference() output
