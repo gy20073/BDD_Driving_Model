@@ -156,6 +156,8 @@ tf.app.flags.DEFINE_string('prior_folder_path', '',
                            'the turning / straight prior file path')
 tf.app.flags.DEFINE_string('prior_name', '',
                            'filename.prior_name')
+tf.app.flags.DEFINE_string('phase', '',
+                           'train, eval, stat')
 
 
 FLAGS = tf.app.flags.FLAGS

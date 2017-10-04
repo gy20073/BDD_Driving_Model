@@ -74,6 +74,9 @@ tf.app.flags.DEFINE_float('sleep_per_iteration', -1.0,
 tf.app.flags.DEFINE_boolean('save_best_model', False,
                             """save the best model during validation""")
 
+tf.app.flags.DEFINE_string('eval_viz_id', "viz",
+                            """the output folder name of the visualization""")
+
 # the best error global recorder
 best_error = 1e9
 should_save = False
@@ -270,7 +273,7 @@ def car_discrete(logits_all, labels_in, loss_op, sess, coord, summary_op, tensor
                               FLAGS.frame_rate/FLAGS.temporal_downsample_factor,
                               isample,
                               True,
-                              os.path.join(FLAGS.eval_dir, "viz"),
+                              os.path.join(FLAGS.eval_dir, FLAGS.eval_viz_id),
                               string_type='image')
       tin_out_v_2 = tin_out_v[2]
     else:
@@ -391,13 +394,13 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
                               model,
                               isample,
                               True,
-                              os.path.join(FLAGS.eval_dir, "viz"))
+                              os.path.join(FLAGS.eval_dir, FLAGS.eval_viz_id))
 
         # save the logits to a file
         names = tin_out_v[2]
         _, short_name = os.path.split(names[isample])
         short_name = short_name.split(".")[0]
-        npz_filename = os.path.join(FLAGS.eval_dir, "viz", short_name + ".logit.npz")
+        npz_filename = os.path.join(FLAGS.eval_dir, FLAGS.eval_viz_id, short_name + ".logit.npz")
         pickle.dump(logits_v, open(npz_filename, 'wb'))
 
     else:

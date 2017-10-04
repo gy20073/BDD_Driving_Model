@@ -1039,39 +1039,39 @@ def vis_continuous_interpolated(tout, predict, frame_rate, car_stop_model,
 
 from scipy import misc
 import matplotlib
-def continuous_vis_single_image(image, logit, method="full"):
+def continuous_vis_single_image(image, predict, method="vis_continuous"):
     matplotlib.use('Agg')
     assert len(image.shape)==3
     name = ["single_image"]
     fake_locs = np.array([[[0.0, 0.0]]])
-    tout = (np.reshape(image, (1, 1, image.shape[0], image.shape[1], image.shape[2])),
+    image = np.reshape(image, (1, 1, image.shape[0], image.shape[1], image.shape[2]))
+    tout = (image,
             None,
             name,
+            image,
             None,
             None,
             fake_locs)
-    predict = np.reshape(logit, (1, 2*FLAGS.discretize_n_bins))
+
     dir_name = "temp"
     import models.car_stop_model as car_stop_model
-    if method == "full":
-        func = vis_continuous
-    elif method == "fancy":
-        func = vis_continuous_interpolated
-    else:
-        raise ValueError("invalid method option")
+
+    func = globals()[method]
 
     image = func(tout, predict,
                  frame_rate=None,
                  car_stop_model=car_stop_model,
                  j=0, save_visualize=None,
                  dir_name=dir_name, vis_radius=None,
-                 need_softmax=False, return_first=True)
+                 need_softmax=True, return_first=True,
+                 save_video=False)
 
     return image
 
 # improved version with various speed and yaw rate
 def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
-                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True, return_first=False):
+                 j=0, save_visualize=False, dir_name="temp", vis_radius=10, need_softmax=True,
+                 return_first=False, save_video=True):
     decoded = tout[0]
     speed = tout[1]
     name = tout[2]
@@ -1172,10 +1172,11 @@ def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
         plt.close()
         print(short_name)
 
-    images2video_highqual(frame_rate=frame_rate, name=short_name, dir_name=dir_name)
+    if save_video:
+        images2video_highqual(frame_rate=frame_rate, name=short_name, dir_name=dir_name)
 
     print("showing visualization for video %s" % name[j])
     if return_first:
-        path = os.path.join(dir_name, 'viz', name[0], '{0:04}.png'.format(0))
+        path = os.path.join(out_dir_name, '{0:05}.png'.format(0))
         image = misc.imread(path, mode='RGB')
         return image

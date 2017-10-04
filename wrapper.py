@@ -20,11 +20,12 @@ import util_car
 FLAGS = tf.app.flags.FLAGS
 flags_passthrough = FLAGS._parse_flags()
 from config import common_config, common_config_post
+import importlib, sys, time
 
 IMSZ = 228
 
 class Wrapper:
-    def __init__(self, model_config_name, model_path, truncate_len=20):
+    def __init__(self, model_config_name, model_path, truncate_len=20, config_name="config", config_path="."):
         # currently, we use a sliding window fashion for evaluation, that's inefficient but convenient to implement
         self.truncate_len = truncate_len
         self.latest_frames = []
@@ -32,7 +33,8 @@ class Wrapper:
             self.latest_frames.append(np.zeros((IMSZ, IMSZ, 3), dtype=np.uint8))
 
         # call the config.py for setup
-        import config
+        sys.path.append(config_path)
+        config = importlib.import_module(config_name)
         common_config("eval")
         config_fun = getattr(config, model_config_name)
         config_fun("eval")
@@ -59,7 +61,7 @@ class Wrapper:
         self.sess = tf.Session(config=config)
         saver.restore(self.sess, model_path)
 
-        self.logits = tf.nn.softmax(logits_all[0])
+        self.logits = logits_all[0]
         init_op = tf.initialize_local_variables()
         self.sess.run(init_op)
 
@@ -81,8 +83,11 @@ class Wrapper:
         batch = np.stack(self.latest_frames, axis=0)
         batch = batch[np.newaxis]
 
+        time0 = time.time()
         logits_v = self.sess.run(self.logits, feed_dict={self.tensors_in: batch})
-        logits_v = logits_v[-1, :]
+        print("only forward pass", time.time()-time0)
+
+        logits_v = logits_v[-1:, :]
         # discrete output method
         '''
         # meaning for discrete actions
@@ -92,7 +97,7 @@ class Wrapper:
         '''
         # continuous output method
         # MAPs = model.continous_MAP([logits_all])
-        return logits_v
+        return [logits_v]
 
     def process_frame(self, image):
         return imresize(image, (IMSZ, IMSZ))
@@ -103,5 +108,5 @@ class Wrapper:
     def continuous_MAP(self, logits):
         return model.continous_MAP(logits)
 
-    def generate_visualization(self, image, logits, method="full"):
+    def generate_visualization(self, image, logits, method="vis_continuous"):
         return util_car.continuous_vis_single_image(image, logits, method)
