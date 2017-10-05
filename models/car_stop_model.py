@@ -157,12 +157,12 @@ tf.app.flags.DEFINE_string('prior_folder_path', '',
 tf.app.flags.DEFINE_string('prior_name', '',
                            'filename.prior_name')
 tf.app.flags.DEFINE_string('phase', '',
-                           'train, eval, stat')
+                           'train, eval, stat, rnn_inference')
 
 
 FLAGS = tf.app.flags.FLAGS
 
-def inference(net_inputs, num_classes, for_training=False, scope=None):
+def inference(net_inputs, num_classes, for_training=False, scope=None, initial_state=None):
     #weight_decay = 0.0005 # disable weight decay and add all of them back in the end.
     weight_decay = 0.0
     FLAGS.weight_decay = weight_decay
@@ -201,7 +201,7 @@ def inference(net_inputs, num_classes, for_training=False, scope=None):
                                              slim.max_pool2d, slim.avg_pool2d,
                                              slim.batch_norm],
                                             outputs_collections=[end_points_collection]):
-                            logits = method(net_inputs, num_classes, for_training)
+                            logits = method(net_inputs, num_classes, for_training, initial_state=initial_state)
 
     weight_decay = 0.0005
     if FLAGS.weight_decay_exclude_bias:
@@ -228,7 +228,7 @@ def inference(net_inputs, num_classes, for_training=False, scope=None):
     activation_summaries(end_points, TOWER_NAME)
     return logits
 
-def LRCN(net_inputs, num_classes, for_training):
+def LRCN(net_inputs, num_classes, for_training, initial_state=None):
     # network inputs are list of tensors:
     # 5D images(NFHWC), valid labels (NF*1), egomotion list (NF*previous_steps*3), this video's name (string)
     if FLAGS.data_provider == "nexar_large_speed":
@@ -389,11 +389,16 @@ def LRCN(net_inputs, num_classes, for_training):
 
             # feed into rnn
             feature_unpacked = tf.unpack(all_features, axis=1)
-            zero_state=stacked_lstm.zero_state(shape[0], dtype=tf.float32)
+
+            if initial_state is not None:
+                begin_state = initial_state
+            else:
+                begin_state = stacked_lstm.zero_state(shape[0], dtype=tf.float32)
+
             output, state = tf.nn.rnn(stacked_lstm,
                                       feature_unpacked,
                                       dtype=tf.float32,
-                                      initial_state=zero_state)
+                                      initial_state=begin_state)
             # TODO: state is not used afterwards
 
             ################Final Classification#################
@@ -503,7 +508,10 @@ def LRCN(net_inputs, num_classes, for_training):
         logits[0] = tf.py_func(func, [logits[0], FLAGS.sub_arch_selection], [tf.float32])[0]
         # set shape
         logits[0].set_shape(old_shape)
-        
+
+    if FLAGS.phase == "rnn_inference":
+        logits += [state]
+
     return logits
     # The usage of logits from model.inference() output
     # it's only used as input to the 1. loss function and 2. _classification evaluation
@@ -572,7 +580,7 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
     return city_segmentation_features
 
 
-def CNN_FC(net_inputs, num_classes, for_training):
+def CNN_FC(net_inputs, num_classes, for_training, initial_state=None):
     FLAGS.temporal_net = "TCNN"
     return LRCN(net_inputs, num_classes, for_training)
 

@@ -25,7 +25,12 @@ import importlib, sys, time
 IMSZ = 228
 
 class Wrapper:
-    def __init__(self, model_config_name, model_path, truncate_len=20, config_name="config", config_path="."):
+    def __init__(self, model_config_name, model_path, truncate_len=20, config_name="config", config_path=".", is_lstm=False):
+        self.is_lstm = is_lstm
+        if is_lstm:
+            assert truncate_len==1, \
+                "using lstm should set truncate_len to 1, otherwise waste of computing resource"
+
         # currently, we use a sliding window fashion for evaluation, that's inefficient but convenient to implement
         self.truncate_len = truncate_len
         self.latest_frames = []
@@ -48,7 +53,19 @@ class Wrapper:
         self.tensors_in = tf.placeholder(tf.uint8, shape=(1, truncate_len, IMSZ, IMSZ, 3), name="images_input")
         self.speed = None
 
-        logits_all = model.inference([self.tensors_in, self.speed], -1, for_training=False)
+        if is_lstm:
+            self.initial_state = ((tf.placeholder(tf.float32,
+                                                  shape=(1, int(FLAGS.lstm_hidden_units)),
+                                                  name="state_placeholder1"),
+                                  tf.placeholder(tf.float32,
+                                                 shape=(1, int(FLAGS.lstm_hidden_units)),
+                                                 name="state_placeholder2")), )
+
+            FLAGS.phase = "rnn_inference"
+        else:
+            self.initial_state = None
+        logits_all = model.inference([self.tensors_in, self.speed], -1, for_training=False,
+                                     initial_state=self.initial_state)
 
         # Restore the moving average version of the learned variables for eval.
         variable_averages = tf.train.ExponentialMovingAverage(model.MOVING_AVERAGE_DECAY)
@@ -62,6 +79,11 @@ class Wrapper:
         saver.restore(self.sess, model_path)
 
         self.logits = logits_all[0]
+        if is_lstm:
+            self.state_tensor = logits_all[-1]
+            self.state_value=[[np.zeros((1, int(FLAGS.lstm_hidden_units)), dtype=np.float32),
+                               np.zeros((1, int(FLAGS.lstm_hidden_units)), dtype=np.float32)]]
+
         init_op = tf.initialize_local_variables()
         self.sess.run(init_op)
 
@@ -84,7 +106,14 @@ class Wrapper:
         batch = batch[np.newaxis]
 
         time0 = time.time()
-        logits_v = self.sess.run(self.logits, feed_dict={self.tensors_in: batch})
+        fd = {self.tensors_in: batch}
+        if self.is_lstm:
+            fd[self.initial_state[0][0]] = self.state_value[0][0]
+            fd[self.initial_state[0][1]] = self.state_value[0][1]
+            logits_v, self.state_value = self.sess.run([self.logits, self.state_tensor], feed_dict=fd)
+        else:
+            logits_v = self.sess.run(self.logits, feed_dict=fd)
+
         print("only forward pass", time.time()-time0)
 
         logits_v = logits_v[-1:, :]
