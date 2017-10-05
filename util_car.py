@@ -408,14 +408,17 @@ def draw_sector(image,
                 uniform_speed=False,
                 consistent_vis=(False, 1e-3, 1e2),
                 has_alpha_channel=False):
+
     course_samples = np.arange(-math.pi / 2-course_delta,
                                math.pi / 2+course_delta,
                                course_delta)
     speed_samples = np.arange(0, max_speed+speed_delta, speed_delta)
+
     total_pdf = car_stop_model.continous_pdf([predict],
                                                 generate_meshlist(course_samples, speed_samples),
                                                 "multi_querys")
     total_pdf = np.reshape(total_pdf, (len(course_samples), len(speed_samples)))
+
     if uniform_speed:
         total_pdf = total_pdf / np.sum(total_pdf, axis=1, keepdims=True)
 
@@ -423,7 +426,6 @@ def draw_sector(image,
     # potential xy positions to be filled
     xy = generate_meshlist(np.arange(w / 2 - speed_scaled, w / 2 + speed_scaled),
                            np.arange(h - speed_scaled, h))
-
     # filter out invalid speed
     v=np.stack((xy[:,0]-w/2, h-xy[:,1]), axis=1)
     speed_norm = np.sqrt(v[:,0]**2 + v[:,1]**2) *(1.0/speed_multiplier)
@@ -441,7 +443,6 @@ def draw_sector(image,
 
     green_portion = 1
     total = total_pdf[icourse, ispeed]
-
     if consistent_vis[0] == False:
         total_max = np.amax(total)
         total = total / total_max * 255*green_portion
@@ -491,12 +492,13 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
         images[i, :, :, :] = draw_sector(images[i, :, :, :],
                     predict[i:(i+1), :],
                     car_stop_model,
-                    course_delta=0.1 / 180 * math.pi,
-                    speed_delta=0.1,
+                    course_delta=0.3 / 180 * math.pi,
+                    speed_delta=0.3,
                     pdf_multiplier=255*10,
                     speed_multiplier=wi/30/3,
                     h=hi, w=wi,
                     consistent_vis=(True, 1e-5, 0.3))
+
         # get the MAP prediction
         map = car_stop_model.continous_MAP([predict[i:(i+1), :]])
         mapline = move_to_line(map.ravel(), hi, wi, 10)
@@ -510,6 +512,7 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
                                                  showing_str,
                                                  lines_color=lines_v,
                                                  fontsize=15)
+
     print("showing visualization for video %s" % name[j])
 
     if return_first:
