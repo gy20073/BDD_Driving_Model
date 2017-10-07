@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import copy
 from datetime import datetime
-import os
+import os, pickle
 import re
 import time
 import importlib
@@ -93,6 +93,9 @@ tf.app.flags.DEFINE_integer('display_summary', 100,
 tf.app.flags.DEFINE_integer('checkpoint_interval', 5000,
                             '''checkpoint per this batch''')
 
+tf.app.flags.DEFINE_string('EWC', 'off',
+                           '''Elastic Weight Consolidation method status: off, stat, apply''')
+
 def _tower_loss(inputs, outputs, num_classes, scope):
   # inputs and outputs are two lists of tensors
 
@@ -156,7 +159,7 @@ def _tower_loss(inputs, outputs, num_classes, scope):
   return total_loss
 
 
-def _average_gradients(tower_grads):
+def _average_gradients(tower_grads, include_square=False):
   """Calculate the average gradient for each shared variable across all towers.
 
   Note that this function provides a synchronization point across all towers.
@@ -170,6 +173,7 @@ def _average_gradients(tower_grads):
      across all towers.
   """
   average_grads = []
+  average_grads_square = []
   for grad_and_vars in zip(*tower_grads):
     # Note that each grad_and_vars looks like the following:
     #   ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
@@ -188,8 +192,8 @@ def _average_gradients(tower_grads):
 
     if none_count==0:
         # Average over the 'tower' dimension.
-        grad = tf.concat(0, grads)
-        grad = tf.reduce_mean(grad, 0)
+        grad_cat = tf.concat(0, grads)
+        grad = tf.reduce_mean(grad_cat, 0)
 
         # Keep in mind that the Variables are redundant because they are shared
         # across towers. So .. we will just return the first tower's pointer to
@@ -197,12 +201,20 @@ def _average_gradients(tower_grads):
         v = grad_and_vars[0][1]
         grad_and_var = (grad, v)
         average_grads.append(grad_and_var)
+
+        if include_square:
+            grad2 = tf.mul(grad_cat, grad_cat, name="square_gradient")
+            grad2 = tf.reduce_mean(grad2, 0)
+            average_grads_square.append((grad2, v))
+
     elif none_count == len(grad_and_vars):
         print("None gradient for %s" % (grad_and_vars[0][1].op.name))
     else:
         raise ValueError("None gradient error")
-
-  return average_grads
+  if include_square:
+      return average_grads, average_grads_square
+  else:
+      return average_grads
 
 
 def _tensor_list_splits(tensor_list, nsplit):
@@ -354,7 +366,17 @@ def train():
 
     # We must calculate the mean of each gradient. Note that this is the
     # synchronization point across all towers.
-    grads = _average_gradients(tower_grads)
+    if FLAGS.EWC == "stat":
+        grads, grads2 = _average_gradients(tower_grads, True)
+        # merge grads2 into a dict of variable
+        out = {}
+        vard = {}
+        for g2, v in grads2:
+            out[v.op.name] = g2
+            vard[v.op.name] = v
+        grads2 = out
+    else:
+        grads = _average_gradients(tower_grads)
 
     # Add a summaries for the input processing and global_step.
     summaries.extend(input_summaries)
@@ -475,6 +497,8 @@ def train():
 
     start_time = time.time()
     duration_compute=0
+    grads2_accu = None
+    grads2_count = 0
 
     step_start = int(sess.run(global_step))
     try:
@@ -482,6 +506,33 @@ def train():
           # call a function in the model definition to do some extra work
           if hasattr(model, 'update_each_step'):
               model.update_each_step(sess, step)
+
+          if FLAGS.EWC == "stat":
+              # then run a stat mode
+              grads2_v = sess.run(grads2)
+
+              if grads2_count == 0:
+                  grads2_accu = grads2_v
+              else:
+                  for key in grads2_v.keys():
+                      grads2_accu[key] += grads2_v[key]
+              grads2_count += 1
+
+              if step == (FLAGS.max_steps - 1):
+                  # save the fisher infomation matirx
+                  for key in grads2_accu.keys():
+                      grads2_accu[key] /= grads2_count
+                  fname = os.path.join(FLAGS.train_dir, "EWC_stat.pkl")
+                  pickle.dump(grads2_accu, open(fname, "wb"))
+
+                  # save the MAP file
+                  vard_v = sess.run(vard)
+                  fname = os.path.join(FLAGS.train_dir, "EWC_map.pkl")
+                  pickle.dump(vard_v, open(fname, "wb"))
+
+              if (step + 1) % FLAGS.display_loss == 0:
+                  print ("processed ", step-step_start, " examples")
+              continue
 
           has_run_meta = False
           if FLAGS.profile:
@@ -559,7 +610,9 @@ def main(_):
       os.environ["LD_LIBRARY_PATH"] = ""
   os.environ["LD_LIBRARY_PATH"] += os.pathsep + "/usr/local/cuda/extras/CUPTI/lib64"
 
-  if tf.gfile.Exists(FLAGS.train_dir):
+  if FLAGS.pretrained_model_checkpoint_path != "":
+    print("resume training from saved model: % s" % FLAGS.pretrained_model_checkpoint_path)
+  elif tf.gfile.Exists(FLAGS.train_dir):
     # find the largest step number: -??
     max_step = -1
     for f in os.listdir(FLAGS.train_dir):

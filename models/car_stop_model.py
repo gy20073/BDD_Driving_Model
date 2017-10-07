@@ -11,7 +11,7 @@ from tensorflow.python.ops import init_ops
 import math, importlib, sys
 import numpy as np
 from util import *
-import copy
+import copy, pickle
 import scipy.ndimage
 from collections import defaultdict
 import models.BasicConvLSTMCell as BasicConvLSTMCell
@@ -159,13 +159,30 @@ tf.app.flags.DEFINE_string('prior_name', '',
 tf.app.flags.DEFINE_string('phase', '',
                            'train, eval, stat, rnn_inference')
 
+tf.app.flags.DEFINE_float('weight_decay', 0.0005,
+                          """L2 regularization.""")
+
+tf.app.flags.DEFINE_string('EWC_Fisher_path', '',
+                           'Where the Fisher diagnal matrix is stored')
+tf.app.flags.DEFINE_string('EWC_MAP_path', '',
+                           'Where the MAP checkpoint is stored')
+tf.app.flags.DEFINE_float('EWC_weight', 0.0,
+                           'the lambda weight for EWC')
+
 
 FLAGS = tf.app.flags.FLAGS
+
+def convert_name(name, new_prefix):
+    if not ("TrainStage" in name):
+        return name
+    else:
+        sp = name.split("/")
+        sp[0] = new_prefix
+        return "/".join(sp)
 
 def inference(net_inputs, num_classes, for_training=False, scope=None, initial_state=None):
     #weight_decay = 0.0005 # disable weight decay and add all of them back in the end.
     weight_decay = 0.0
-    FLAGS.weight_decay = weight_decay
     bias_initialize_value = 0.1
     # tunable things end here
 
@@ -203,25 +220,52 @@ def inference(net_inputs, num_classes, for_training=False, scope=None, initial_s
                                             outputs_collections=[end_points_collection]):
                             logits = method(net_inputs, num_classes, for_training, initial_state=initial_state)
 
-    weight_decay = 0.0005
-    if FLAGS.weight_decay_exclude_bias:
-        decay_set = []
-        excluded = []
-        included = []
-        for v in tf.trainable_variables():
-            name = v.op.name
-            if "biases" in name:
-                excluded.append(name)
-            else:
-                decay_set.append(tf.nn.l2_loss(v))
-                included.append(name)
-        print("excluded weight decays are: ", excluded)
-        print("included weight decays are: ", included)
-    else:
-        decay_set = [tf.nn.l2_loss(v) for v in tf.trainable_variables()]
+    if FLAGS.weight_decay > 1e-8:
+        weight_decay = FLAGS.weight_decay
+        if FLAGS.weight_decay_exclude_bias:
+            decay_set = []
+            excluded = []
+            included = []
+            for v in tf.trainable_variables():
+                name = v.op.name
+                if "biases" in name:
+                    excluded.append(name)
+                else:
+                    decay_set.append(tf.nn.l2_loss(v))
+                    included.append(name)
+            print("excluded weight decays are: ", excluded)
+            print("included weight decays are: ", included)
+        else:
+            decay_set = [tf.nn.l2_loss(v) for v in tf.trainable_variables()]
 
-    l2_loss = weight_decay * tf.add_n(decay_set)
-    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, l2_loss)
+        l2_loss = weight_decay * tf.add_n(decay_set)
+        tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, l2_loss)
+
+    if FLAGS.EWC_weight > 1e-8:
+        # load Fisher matrix
+        fisher = pickle.load(open(FLAGS.EWC_Fisher_path, "rb"))
+        # load MAP
+        map = pickle.load(open(FLAGS.EWC_MAP_path, "rb"))
+        # construct the trainable variable set
+        trainable = {}
+        for v in tf.trainable_variables():
+            trainable[v.op.name] = v
+
+        new_prefix = "TrainStage1_%s" % FLAGS.unique_experiment_name
+        ewc_set = []
+        for old_name in fisher.keys():
+            new_name = convert_name(old_name, new_prefix)
+            if new_name not in trainable:
+                print ("EWC Warning: %s var not in the new graph, skipping it" % new_name)
+                continue
+            else:
+                print ("EWC: adding %s var with EWC loss" % new_name)
+            temp = tf.square(tf.sub(trainable[new_name] - map[old_name]))
+            temp = tf.mul(temp, fisher[old_name])
+            temp = tf.reduce_sum(temp)
+            ewc_set.append(temp)
+        ewc_loss = FLAGS.EWC_weight * tf.add_n(ewc_set)
+        tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, ewc_loss)
 
     # Convert end_points_collection into a end_point dict.
     end_points = tf.get_collection(end_points_collection)

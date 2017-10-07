@@ -7,11 +7,6 @@ from tensorflow.python.ops import nn
 import math
 
 
-tf.app.flags.DEFINE_float('weight_decay', 0.0,
-                          """L2 regularization.""")
-FLAGS = tf.app.flags.FLAGS
-
-
 DEFAULT_PADDING = 'SAME'
 
 
@@ -167,7 +162,8 @@ class Network(object):
              padding=DEFAULT_PADDING,
              group=1,
              biased=True,
-             rate=1):
+             rate=1,
+             weight_decay=0.0):
         # Verify that the padding is acceptable
         self.validate_padding(padding)
         # Get the number of channels in the input
@@ -183,9 +179,10 @@ class Network(object):
 
         with tf.variable_scope(name) as scope:
             kernel = self.make_var('weights', shape=[k_h, k_w, c_i / group, c_o])
-            print("weight = ", FLAGS.weight_decay)
-            reg = FLAGS.weight_decay * tf.nn.l2_loss(kernel, name+'_weight_norm')
-            tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, reg)
+            print("weight decay inside network.py = ", weight_decay)
+            if weight_decay > 1e-8:
+                reg = weight_decay * tf.nn.l2_loss(kernel, name+'_weight_norm')
+                tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, reg)
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
                 output = convolve(input, kernel)
