@@ -241,7 +241,7 @@ def inference(net_inputs, num_classes, for_training=False, scope=None, initial_s
         l2_loss = weight_decay * tf.add_n(decay_set)
         tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, l2_loss)
 
-    if FLAGS.EWC_weight > 1e-8:
+    if FLAGS.EWC_weight > 1e-8 and for_training:
         # load Fisher matrix
         fisher = pickle.load(open(FLAGS.EWC_Fisher_path, "rb"))
         # load MAP
@@ -260,12 +260,12 @@ def inference(net_inputs, num_classes, for_training=False, scope=None, initial_s
                 continue
             else:
                 print ("EWC: adding %s var with EWC loss" % new_name)
-            temp = tf.square(tf.sub(trainable[new_name] - map[old_name]))
+            temp = tf.square(tf.sub(trainable[new_name], map[old_name]))
             temp = tf.mul(temp, fisher[old_name])
             temp = tf.reduce_sum(temp)
             ewc_set.append(temp)
-        ewc_loss = FLAGS.EWC_weight * tf.add_n(ewc_set)
-        tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, ewc_loss)
+        ewc_loss = tf.mul(FLAGS.EWC_weight, tf.add_n(ewc_set), name="EWC_loss")
+        tf.add_to_collection(tf.GraphKeys.LOSSES, ewc_loss)
 
     # Convert end_points_collection into a end_point dict.
     end_points = tf.get_collection(end_points_collection)
