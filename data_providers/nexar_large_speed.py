@@ -96,6 +96,9 @@ tf.app.flags.DEFINE_boolean('use_speed_yaw', False,
                             'directly stores the speed and yaw rate in the TFRecord. ')
 tf.app.flags.DEFINE_boolean('is_MKZ_dataset', False,
                             'The newly collected data on the Lincoln MKZ')
+tf.app.flags.DEFINE_string('custom_dataset_name', '',
+                           'a customized dataset name')
+
 tf.app.flags.DEFINE_boolean('use_non_random_shuffle', False,
                             'Whether to shuffle the files')
 
@@ -125,6 +128,9 @@ class MyDataset(Dataset):
             if FLAGS.retain_first_k_training_example > 0:
                 return FLAGS.retain_first_k_training_example
 
+            if FLAGS.custom_dataset_name == "nexar_MKZ":
+                return 21244
+
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
                 return 40
@@ -146,6 +152,9 @@ class MyDataset(Dataset):
             else:
                 return 28738
         if self.subset == 'validation':
+            if FLAGS.custom_dataset_name == "nexar_MKZ":
+                return 9
+
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
                 return 9
@@ -998,7 +1007,7 @@ class MyDataset(Dataset):
         assert (F == F2)
         assert (C2 == 2)
 
-        perspective_aug_prob = 0.1
+        perspective_aug_prob = 0.03
         perspective_recover_time = 2.0 # second
         perspective_theta_std = 0.15
         # image related

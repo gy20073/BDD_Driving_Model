@@ -169,6 +169,8 @@ tf.app.flags.DEFINE_string('EWC_MAP_path', '',
 tf.app.flags.DEFINE_float('EWC_weight', 0.0,
                            'the lambda weight for EWC')
 
+tf.app.flags.DEFINE_boolean('ss_bottleneck_arch', False,
+                            'whether to use the bottle neck architecture')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -329,7 +331,7 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
         stage_status = "TrainStage1"
         #note: TrainStage1 vs TrainStage1_Pri for the version changes!
     if FLAGS.city_data:
-        city_features = privileged_training(net_inputs, num_classes, for_training, stage_status, images, shape)
+        city_features, image_features = privileged_training(net_inputs, num_classes, for_training, stage_status, images, shape, image_features)
     if FLAGS.omit_action_loss:
         return [None, city_features]
 
@@ -560,7 +562,7 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
     # The usage of logits from model.inference() output
     # it's only used as input to the 1. loss function and 2. _classification evaluation
 
-def privileged_training(net_inputs, num_classes, for_training, stage_status, images, shape):
+def privileged_training(net_inputs, num_classes, for_training, stage_status, images, shape, image_features):
     if FLAGS.data_provider == "nexar_large_speed":
         city_ims = net_inputs[3]
     else:
@@ -589,7 +591,6 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
     else:
         city_features = net.layers[FLAGS.cnn_feature]
 
-
     with tf.variable_scope(stage_status):
         with tf.variable_scope('Ptrain'):
             if FLAGS.early_split:
@@ -607,6 +608,17 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
                                         padding='VALID',
                                         scope='segmentation_fc8')
 
+            if FLAGS.ss_bottleneck_arch:
+                assert (FLAGS.early_split == False)
+                # reduce the dimensionality from the conv5 feature map
+                with tf.variable_scope('motion_tower'):
+                    # size 224/8 = 28
+                    image_features = slim.conv2d(image_features, 64, [5, 5], 3, scope='motion1')
+                    # size 9
+                    image_features = slim.conv2d(image_features, 128, [5, 5], 3, scope='motion2')
+                    # size 3
+
+            # city features are the predicted semantic segmentation image
             city_segmentation_features = city_features
 
             pred = tf.argmax(city_features, 3)
@@ -621,7 +633,7 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
 
             tf.image_summary("segmentation_visualization", pred, max_images=113)
 
-    return city_segmentation_features
+    return city_segmentation_features, image_features
 
 
 def CNN_FC(net_inputs, num_classes, for_training, initial_state=None):
