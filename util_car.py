@@ -1078,11 +1078,19 @@ def vis_continuous_yang(tout, predict, frame_rate, car_stop_model,
     decoded = tout[0]
     speed = tout[1]
     name = tout[2]
-    highres = tout[3]
+    if FLAGS.city_data:
+        seg_image = tout[3]
+        highres = tout[4]
 
-    isstop = tout[4]
-    turn = tout[5]
-    locs = tout[6]
+        isstop = tout[5]
+        turn = tout[6]
+        locs = tout[7]
+    else:
+        highres = tout[3]
+
+        isstop = tout[4]
+        turn = tout[5]
+        locs = tout[6]
     decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])

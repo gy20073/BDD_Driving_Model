@@ -171,6 +171,9 @@ tf.app.flags.DEFINE_float('EWC_weight', 0.0,
 
 tf.app.flags.DEFINE_boolean('ss_bottleneck_arch', False,
                             'whether to use the bottle neck architecture')
+tf.app.flags.DEFINE_integer('image_preprocess_pad_seg', -1,
+                           """How many padding to be added to the image input, for segmentation image""")
+
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -576,7 +579,10 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
                 city_im_shape[4]])
 
     NET = globals()[FLAGS.segmentation_network_arch]
-    processed_images = NET.preprocess(city_ims)
+    if FLAGS.image_preprocess_pad_seg >= 0:
+        processed_images = NET.preprocess(city_ims, FLAGS.image_preprocess_pad_seg)
+    else:
+        processed_images = NET.preprocess(city_ims)
 
     use_dropout = 0.0
     if FLAGS.enable_basenet_dropout and for_training:
@@ -610,6 +616,14 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
 
             if FLAGS.ss_bottleneck_arch:
                 assert (FLAGS.early_split == False)
+                image_features = slim.conv2d(image_features, FLAGS.city_num_classes, [1, 1], 1,
+                                            normalizer_fn=None,
+                                            activation_fn=None,
+                                            biases_initializer=init_ops.zeros_initializer,
+                                            padding='VALID',
+                                            scope='segmentation_fc8',
+                                            reuse=True)
+
                 # reduce the dimensionality from the conv5 feature map
                 with tf.variable_scope('motion_tower'):
                     # size 224/8 = 28
