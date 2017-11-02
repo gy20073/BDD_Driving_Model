@@ -154,6 +154,8 @@ class MyDataset(Dataset):
         if self.subset == 'validation':
             if FLAGS.custom_dataset_name == "nexar_MKZ":
                 return 9
+            elif FLAGS.custom_dataset_name == "nexar_vehicle_ahead":
+                return 20
 
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")

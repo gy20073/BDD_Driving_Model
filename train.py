@@ -444,6 +444,18 @@ def train():
     # Build the summary operation from the last tower summaries.
     summary_op = tf.merge_summary(summaries)
 
+    # some variables allocated for the accumulators
+    if FLAGS.EWC == "stat":
+        grads2_accu = {}
+        accu_ops = {}
+        with tf.device('/gpu:0'):
+            for key in grads2.keys():
+                shape = [x.value for x in grads2[key].get_shape()]
+                grads2_accu[key] = tf.Variable(initial_value=np.zeros(shape, dtype=np.float32),
+                                               trainable=False,
+                                               name=key+"_accumulator")
+                accu_ops[key] = tf.assign_add(grads2_accu[key], grads2[key], name=key+"_assign_add")
+
     # Build an initialization operation to run below.
     init = tf.initialize_all_variables()
 
@@ -497,7 +509,6 @@ def train():
 
     start_time = time.time()
     duration_compute=0
-    grads2_accu = None
     grads2_count = 0
 
     step_start = int(sess.run(global_step))
@@ -508,14 +519,24 @@ def train():
               model.update_each_step(sess, step)
 
           if FLAGS.EWC == "stat":
-              # then run a stat mode
-              grads2_v = sess.run(grads2)
-
-              if grads2_count == 0:
-                  grads2_accu = grads2_v
+              grads2_accu_op = grads2_accu
+              if step == (FLAGS.max_steps - 1):
+                  sessout = sess.run([grads2_accu_op, accu_ops])
+                  grads2_accu=sessout[0]
               else:
-                  for key in grads2_v.keys():
-                      grads2_accu[key] += grads2_v[key]
+                  if FLAGS.profile:
+                      run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+                      run_metadata = tf.RunMetadata()
+                      sess.run(accu_ops, options=run_options, run_metadata=run_metadata)
+
+                      tl = timeline.Timeline(run_metadata.step_stats)
+                      ctf = tl.generate_chrome_trace_format()
+                      with open(os.path.join(FLAGS.train_dir, 'timeline.json'), 'w') as f:
+                          f.write(ctf)
+                      print("generated a time line profile for one session")
+                  else:
+                    sess.run(accu_ops)
+
               grads2_count += 1
 
               if step == (FLAGS.max_steps - 1):

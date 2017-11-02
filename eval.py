@@ -134,6 +134,7 @@ def _eval_once(saver, summary_writer, logits_all, labels, loss_op, summary_op, t
 
     # Restores from checkpoint with absolute path.
     saver.restore(sess, ckpt_path)
+    
     # Assuming model_checkpoint_path looks something like:
     #   /my-favorite-path/imagenet_train/model.ckpt-0,
     # extract global_step from it.
@@ -421,6 +422,8 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
       print('%s: [%d batches out of %d] (%.1f examples/sec; %.3f sec/batch)' %
             (datetime.now(), step, num_iter, examples_per_sec, sec_per_batch))
       start_time = time.time()
+    elif step == (num_iter-1):
+      print("last round of iter=", step)
 
     tspend = time.time() - t0
     if FLAGS.sleep_per_iteration - tspend > 0:
@@ -445,7 +448,7 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
 
   summary.value.add(tag='test_loglike/total', simple_value=np.asscalar(np.mean(meanLikes)))
   summary.value.add(tag='test_loss_biased', simple_value=total_loss)
-  print("cross entropy=%f, log(likelihoods): total=%f" % (total_loss, np.mean(meanLikes)))
+  print("test cross entropy=%f, log(likelihoods): total=%f" % (total_loss, np.mean(meanLikes)))
 
   return summary
 
