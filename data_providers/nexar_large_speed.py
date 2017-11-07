@@ -107,6 +107,9 @@ tf.app.flags.DEFINE_integer('crop_car_hood', -1,
 tf.app.flags.DEFINE_boolean('use_perspective_augmentation', False,
                             'Whether to perspective augmentation')
 
+tf.app.flags.DEFINE_integer('inflate_MKZ_factor', -1,
+                            'inflate the MKZ data if > 0 ')
+
 
 # the newly designed class has to have those methods
 # especially the reader() that reads the binary record and the
@@ -153,7 +156,7 @@ class MyDataset(Dataset):
                 return 28738
         if self.subset == 'validation':
             if FLAGS.custom_dataset_name == "nexar_MKZ":
-                return 9
+                return 29
             elif FLAGS.custom_dataset_name == "nexar_vehicle_ahead":
                 return 20
 
@@ -220,6 +223,16 @@ class MyDataset(Dataset):
                                                                   FLAGS.data_dir))
                 self.download_message()
                 exit(-1)
+
+        if FLAGS.inflate_MKZ_factor > 0 and self.subset == "train":
+            # manually inflate the MKZ examples
+            MKZ_names = [name for name in data_files if len(name) < 16]
+            data_files = data_files + MKZ_names * (FLAGS.inflate_MKZ_factor - 1)
+            random.seed(a=1)
+            random.shuffle(data_files)
+            print("using the inflate factor")
+
+
         print('Glob Files Done...')
         if FLAGS.retain_first_k_training_example > 0 and self.subset == "train":
             data_files = sorted(data_files)
@@ -867,6 +880,11 @@ class MyDataset(Dataset):
 
         # adding the raw images
         ins += batched[decoded_raw_loc:(decoded_raw_loc+1)]
+
+        if FLAGS.action_mapping_loss:
+            assert not FLAGS.city_data
+            assert not FLAGS.only_seg
+            outs += [ins[-2]]
 
         # dropout non-stop videos
         if FLAGS.balance_drop_prob > 0:

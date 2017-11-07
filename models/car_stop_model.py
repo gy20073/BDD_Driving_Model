@@ -174,6 +174,17 @@ tf.app.flags.DEFINE_boolean('ss_bottleneck_arch', False,
 tf.app.flags.DEFINE_integer('image_preprocess_pad_seg', -1,
                            """How many padding to be added to the image input, for segmentation image""")
 
+tf.app.flags.DEFINE_boolean('action_mapping_arch', False,
+                            'whether to use extra action mapping architecture')
+tf.app.flags.DEFINE_boolean('action_mapping_loss', False,
+                            'whether to supervise the intermediate output with extra data')
+tf.app.flags.DEFINE_float('action_mapping_main_weight', 1.0,
+                           'weights for the action mapping branch')
+# for the hinge loss
+tf.app.flags.DEFINE_float('action_mapping_threshold', 0.05,
+                           'C * max(thresh, |dist1-dist2|)')
+tf.app.flags.DEFINE_float('action_mapping_C', 100.0, '')
+
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -564,6 +575,23 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
 
     if FLAGS.phase == "rnn_inference":
         logits += [state]
+
+    if FLAGS.action_mapping_arch:
+        # first make sure that the different functions that modify logits doesn't collide
+        assert not(FLAGS.phase == "rnn_inference")
+        assert not FLAGS.city_data
+
+        # build the action mapping arch, designed for the joint continuous prediction
+        assert FLAGS.sub_arch_selection == "car_joint"
+        hw = FLAGS.discretize_n_bins
+        act = tf.reshape(logits[0], [shape[0]*shape[1], hw, hw, 1])
+        import models.LocallyConv2d as lc2
+        act = lc2.layer_local_conv2d(act, num_output=5, kernel_size=[5, 5], strides=[1, 1], use_relu=True, scope="map1")
+        act = lc2.layer_local_conv2d(act, num_output=5, kernel_size=[5, 5], strides=[1, 1], use_relu=True, scope="map2")
+        act = lc2.layer_local_conv2d(act, num_output=1, kernel_size=[5, 5], strides=[1, 1], use_relu=False, scope="map3")
+        act = tf.reshape(act, [shape[0]*shape[1], hw*hw])
+
+        logits = [act, logits[0]]
 
     return logits
     # The usage of logits from model.inference() output
@@ -996,7 +1024,7 @@ def course_speed_to_joint_bin(labels):
     return out
 
 
-def loss_car_joint(logits, net_outputs, batch_size=None):
+def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
     # net_outputs contains is_stop, turn, locs
     future_labels = net_outputs[2]    # shape: N * F * 2
     # reshape to 2 dimension
@@ -1007,7 +1035,9 @@ def loss_car_joint(logits, net_outputs, batch_size=None):
                               [future_labels],
                               [tf.float32])[0]
 
-    if FLAGS.class_balance_path!="":
+    if masks is not None:
+        pass
+    elif FLAGS.class_balance_path!="":
         path = FLAGS.class_balance_path + "_joint.npy"
         dist = np.load(path)
 
@@ -1024,6 +1054,49 @@ def loss_car_joint(logits, net_outputs, batch_size=None):
                                       weight=masks,
                                       scope="softmax_loss_joint")
 
+
+def py_is_mkz(names, ntotal):
+    ans = []
+    assert ntotal % len(names) == 0
+    nrepeats = int(ntotal / len(names))
+    for name in names:
+        try:
+            num = int(name)
+            if num < 100000:
+                ans.append(1.0)
+            else:
+                ans.append(0.0)
+        except:
+            ans.append(0.0)
+
+    out = []
+    for a in ans:
+        for i in range(nrepeats):
+            out.append(a)
+
+    return np.array(out, dtype=np.float32)
+
+
+def loss2joint(logits, net_outputs):
+    # compute the weight to see which are nexar / MKZ datasets
+    ninstance = logits[0].get_shape()[0].value
+    masks = tf.py_func(py_is_mkz,
+                       [net_outputs[-1], ninstance],
+                       [tf.float32])[0]  # 1.0 if it's a MKZ data TODO: compute which are for MKZ and which are for nexar
+    masks.set_shape([ ninstance ])
+    # for MKZ
+    with tf.variable_scope("MKZ_loss"):
+        loss_car_joint([logits[0]], net_outputs, masks=masks * FLAGS.action_mapping_main_weight)
+    # for nexar
+    with tf.variable_scope("nexar_loss"):
+        loss_car_joint([logits[1]], net_outputs, masks=1.0-masks)
+
+    with tf.variable_scope("limit_change_loss"):
+        dist = tf.reduce_sum(tf.abs(tf.nn.softmax(logits[0])-tf.nn.softmax(logits[1])), 1)
+        losses = FLAGS.action_mapping_C * tf.maximum(0.0, dist - FLAGS.action_mapping_threshold)
+        loss = tf.reduce_mean(losses)
+        tf.add_to_collection(tf.GraphKeys.LOSSES, loss)
+
 def loss(logits, net_outputs, batch_size=None):
     if FLAGS.city_data:
         #city seg loss
@@ -1031,6 +1104,10 @@ def loss(logits, net_outputs, batch_size=None):
         seg_mask = net_outputs[3]
         city_seg_loss = city_loss(city_logits, seg_mask)
     if FLAGS.omit_action_loss:
+        return
+
+    if FLAGS.action_mapping_loss:
+        loss2joint(logits, net_outputs)
         return
 
     func = globals()["loss_%s" % FLAGS.sub_arch_selection]

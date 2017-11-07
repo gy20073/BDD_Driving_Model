@@ -134,7 +134,7 @@ def _eval_once(saver, summary_writer, logits_all, labels, loss_op, summary_op, t
 
     # Restores from checkpoint with absolute path.
     saver.restore(sess, ckpt_path)
-    
+
     # Assuming model_checkpoint_path looks something like:
     #   /my-favorite-path/imagenet_train/model.ckpt-0,
     # extract global_step from it.
