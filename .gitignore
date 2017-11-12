@@ -10,3 +10,4 @@ scratch.ipynb
 *DS_Store*
 data_providers/near_dataset_sanity_check_harry.ipynb
 *.so
+private/

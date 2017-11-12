@@ -174,8 +174,8 @@ tf.app.flags.DEFINE_boolean('ss_bottleneck_arch', False,
 tf.app.flags.DEFINE_integer('image_preprocess_pad_seg', -1,
                            """How many padding to be added to the image input, for segmentation image""")
 
-tf.app.flags.DEFINE_boolean('action_mapping_arch', False,
-                            'whether to use extra action mapping architecture')
+tf.app.flags.DEFINE_string('action_mapping_arch', "",
+                            'which action mapping arch to apply')
 tf.app.flags.DEFINE_boolean('action_mapping_loss', False,
                             'whether to supervise the intermediate output with extra data')
 tf.app.flags.DEFINE_float('action_mapping_main_weight', 1.0,
@@ -576,13 +576,15 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
     if FLAGS.phase == "rnn_inference":
         logits += [state]
 
-    if FLAGS.action_mapping_arch:
+    if FLAGS.action_mapping_arch != "":
         # first make sure that the different functions that modify logits doesn't collide
-        assert not(FLAGS.phase == "rnn_inference")
+        assert not (FLAGS.phase == "rnn_inference")
         assert not FLAGS.city_data
 
         # build the action mapping arch, designed for the joint continuous prediction
         assert FLAGS.sub_arch_selection == "car_joint"
+
+    if FLAGS.action_mapping_arch == "v1":
         hw = FLAGS.discretize_n_bins
         act = tf.reshape(logits[0], [shape[0]*shape[1], hw, hw, 1])
         import models.LocallyConv2d as lc2
@@ -592,6 +594,15 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
         act = tf.reshape(act, [shape[0]*shape[1], hw*hw])
 
         logits = [act, logits[0]]
+
+    if FLAGS.action_mapping_arch == "v2":
+        logits += [slim.fully_connected(hidden_out,
+                                       num_classes,
+                                       scope=scope+"_nexar",
+                                       activation_fn=None,
+                                       normalizer_fn=None,
+                                       biases_initializer=tf.zeros_initializer)]
+
 
     return logits
     # The usage of logits from model.inference() output

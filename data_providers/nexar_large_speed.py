@@ -133,6 +133,8 @@ class MyDataset(Dataset):
 
             if FLAGS.custom_dataset_name == "nexar_MKZ":
                 return 21244
+            elif FLAGS.custom_dataset_name == "day_night":
+                return 4977
 
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
@@ -159,6 +161,8 @@ class MyDataset(Dataset):
                 return 29
             elif FLAGS.custom_dataset_name == "nexar_vehicle_ahead":
                 return 20
+            elif FLAGS.custom_dataset_name == "day_night":
+                return 6478
 
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
@@ -226,7 +230,8 @@ class MyDataset(Dataset):
 
         if FLAGS.inflate_MKZ_factor > 0 and self.subset == "train":
             # manually inflate the MKZ examples
-            MKZ_names = [name for name in data_files if len(name) < 16]
+            MKZ_names = [name for name in data_files if len(name.split("/")[-1]) < 16]
+            print(MKZ_names)
             data_files = data_files + MKZ_names * (FLAGS.inflate_MKZ_factor - 1)
             random.seed(a=1)
             random.shuffle(data_files)
