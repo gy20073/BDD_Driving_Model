@@ -938,21 +938,16 @@ class MyDataset(Dataset):
                 print("using random crop and brightness and constrast jittering")
                 # shape = B F H W C
                 shape = [x.value for x in images.get_shape()]
-                images = tf.random_crop(images, [shape[0], shape[1],
-                                                 int(shape[2]*0.8),
-                                                 int(shape[3]*0.8),
-                                                 shape[4]])
+                images = tf.reshape(images, [shape[0] * shape[1], shape[2], shape[3], shape[4]])
 
                 images = tf.image.random_brightness(images, max_delta=32. / 255.)
-                images = tf.image.random_contrast(images, lower=0.6, upper=1.4)
-                #images = tf.image.random_saturation(images, lower=0.9, upper=1.1)
-                #images = tf.image.random_hue(images, max_delta=0.05)
+                images = tf.image.random_contrast(images, lower=0.7, upper=1.3)
+                #images = tf.image.random_hue(images, max_delta=0.2)
+                #images = tf.image.random_saturation(images, lower=0.7, upper=1.3)
 
                 # The random_* ops do not necessarily clamp. But return uint8 thus not needed
                 #images = tf.clip_by_value(images, 0, 255)
-                shape_new = tf.shape(images)
-                images = tf.reshape(images, [shape[0]*shape[1], shape_new[2], shape_new[3], shape[4]])
-                images = tf.image.resize_images(images, [shape[2], shape[3]])
+
                 images = tf.reshape(images, shape)
                 images = tf.cast(images, tf.uint8)
             net_inputs[0] = images

@@ -24,6 +24,8 @@ import matplotlib
 import StringIO
 import multiprocessing
 
+# might need to switch to this get_interpolated_speed when replaying GPS
+#from MKZ.nodes.json_to_speed import get_interpolated_speed
 
 tf.app.flags.DEFINE_string('video_index', '/data/nx-bdd-20160929/video_filtered_index_38_60_sec.txt', 'filtered video indexing')
 tf.app.flags.DEFINE_string('output_directory', '/data/nx-bdd-20160929/tfrecord_fix_speed/', 'Training data directory')
