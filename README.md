@@ -7,7 +7,7 @@ proposed a FCN+LSTM model and implement it using tensorflow.
 
 ## The Berkeley DeepDrive Video Dataset(BDD-V)
 
-BDD-V dataset will be released [here](https://goo.gl/forms/7XThUcjpGALkqxFU2). Sign up for notification when we release the data
+### BDD-V dataset will be released [here](http://data-bdd.berkeley.edu).  
 
 ## Using Our Code:
 ### Installation
