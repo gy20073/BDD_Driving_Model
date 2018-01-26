@@ -548,7 +548,7 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
         else:
             raise ValueError("not valid sub_arch_selection")
 
-
+        # This output has shape [batch*nframe, num_classes]
         logits = [slim.fully_connected(hidden_out,
                                        num_classes,
                                        scope=scope,
@@ -1109,6 +1109,20 @@ def loss2joint(logits, net_outputs):
         tf.add_to_collection(tf.GraphKeys.LOSSES, loss)
 
 def loss(logits, net_outputs, batch_size=None):
+    # truncate logits and the corresponding net_output, to ignore the appending FLAGS.stop_future_frames labels
+    # This will only affect the training, thus not affect the testing of any trained model
+    future_labels = net_outputs[2]  # shape: N * F * 2
+    shape = [x.value for x in future_labels.get_shape()]
+    # logits[0] originally has shape [batch*nframe, num_classes]
+    logits[0] = tf.reshape(logits[0], [shape[0], shape[1], logits[0].get_shape()[-1].value])
+    logits[0] = logits[0][:, :-FLAGS.stop_future_frames, :]
+    logits[0] = tf.reshape(logits[0], [shape[0]*(shape[1]-FLAGS.stop_future_frames), -1])
+
+    net_outputs[0] = net_outputs[0][:, :-FLAGS.stop_future_frames]
+    net_outputs[1] = net_outputs[1][:, :-FLAGS.stop_future_frames, :]
+    net_outputs[2] = net_outputs[2][:, :-FLAGS.stop_future_frames, :]
+    # end of fixing last images doesn't have a true label
+
     if FLAGS.city_data:
         #city seg loss
         city_logits = logits[1]
