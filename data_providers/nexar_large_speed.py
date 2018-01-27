@@ -135,6 +135,8 @@ class MyDataset(Dataset):
                 return 21244
             elif FLAGS.custom_dataset_name == "day_night":
                 return 4977
+            elif FLAGS.custom_dataset_name == "rfs_on_off_policy":
+                return 800
 
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
@@ -163,6 +165,8 @@ class MyDataset(Dataset):
                 return 20
             elif FLAGS.custom_dataset_name == "day_night":
                 return 6478
+            elif FLAGS.custom_dataset_name == "rfs_on_off_policy":
+                return 272
 
             if FLAGS.is_MKZ_dataset:
                 print("using the MKZ dataset")
@@ -940,8 +944,8 @@ class MyDataset(Dataset):
                 shape = [x.value for x in images.get_shape()]
                 images = tf.reshape(images, [shape[0] * shape[1], shape[2], shape[3], shape[4]])
 
-                images = tf.image.random_brightness(images, max_delta=32. / 255.)
-                images = tf.image.random_contrast(images, lower=0.7, upper=1.3)
+                images = tf.image.random_brightness(images, max_delta=64. / 255.)
+                images = tf.image.random_contrast(images, lower=0.6, upper=1.4)
                 #images = tf.image.random_hue(images, max_delta=0.2)
                 #images = tf.image.random_saturation(images, lower=0.7, upper=1.3)
 

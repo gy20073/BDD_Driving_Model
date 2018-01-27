@@ -1109,6 +1109,8 @@ def loss2joint(logits, net_outputs):
         tf.add_to_collection(tf.GraphKeys.LOSSES, loss)
 
 def loss(logits, net_outputs, batch_size=None):
+    logits = copy.copy(logits)
+    net_outputs = copy.copy(net_outputs)
     # truncate logits and the corresponding net_output, to ignore the appending FLAGS.stop_future_frames labels
     # This will only affect the training, thus not affect the testing of any trained model
     future_labels = net_outputs[2]  # shape: N * F * 2
