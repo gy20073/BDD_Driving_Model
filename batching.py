@@ -43,6 +43,9 @@ tf.app.flags.DEFINE_boolean('use_MIMO_inputs_pipeline', False,
                             """Use the multiple inputs and multiple outputs reading pipeline""")
 tf.app.flags.DEFINE_integer('num_batch_join', 4,
                             """How many batch_join, large enough to avoid single threaded dequeue many""")
+tf.app.flags.DEFINE_integer('buffer_queue_capacity_multiply_factor', 1,
+                            """the capacity of the buffer queue is defined as factor*FLAGS.num_batch_join""")
+
 
 
 def inputs(dataset, batch_size=None, num_preprocess_threads=None):
@@ -232,8 +235,8 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
                   reduced_factor*batch_size, " instances")
 
         # add a buffering queue to remove the dequeue_many time
-        print("buffer queue capacity is: ", FLAGS.num_batch_join, " batches")
-        capacity = FLAGS.num_batch_join
+        capacity = FLAGS.num_batch_join * FLAGS.buffer_queue_capacity_multiply_factor
+        print("buffer queue capacity is: ", capacity, " batches")
         buffer_queue = tf.FIFOQueue(
             capacity= capacity,
             dtypes=[x.dtype for x in one_joined],
