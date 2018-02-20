@@ -110,6 +110,8 @@ tf.app.flags.DEFINE_boolean('use_perspective_augmentation', False,
 tf.app.flags.DEFINE_integer('inflate_MKZ_factor', -1,
                             'inflate the MKZ data if > 0 ')
 
+tf.app.flags.DEFINE_boolean('use_nan_padding', False,
+                            'Whether to use nan padding in the data provider')
 
 # the newly designed class has to have those methods
 # especially the reader() that reads the binary record and the
@@ -814,14 +816,25 @@ class MyDataset(Dataset):
             spd = features['sensor/speed_steer'].values
             ys = tf.pack([yaw, spd], axis=1, name="stack_yaw_speed")
             # Now the shape is N*2
+
             ys = ys[tstart : FLAGS.FRAMES_IN_SEG : FLAGS.temporal_downsample_factor, :]
             ys.set_shape([len_downsampled, 2])
 
-            # compute locs from ys
-            ys = tf.pad(  ys,
-                          [[0, FLAGS.stop_future_frames], [0, 0]],
-                          mode="SYMMETRIC",
-                          name="pad_afterwards")
+            if not FLAGS.use_nan_padding:
+                # compute locs from ys
+                ys = tf.pad(  ys,
+                              [[0, FLAGS.stop_future_frames], [0, 0]],
+                              mode="SYMMETRIC",
+                              name="pad_afterwards")
+            else:
+                # invalidate the last two entries by setting it to NaN
+                nan_const = tf.constant(float('NaN'),
+                                        dtype=tf.float32,
+                                        shape=(FLAGS.stop_future_frames, 2),
+                                        name="NaN_constant")
+                ys = tf.concat(0, [ys, nan_const], name="nan_pad_afterwards")
+
+
             ys = ys[FLAGS.stop_future_frames:, :]
             ys.set_shape([len_downsampled, 2])
             locs = ys

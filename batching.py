@@ -46,6 +46,9 @@ tf.app.flags.DEFINE_integer('num_batch_join', 4,
 tf.app.flags.DEFINE_integer('buffer_queue_capacity_multiply_factor', 1,
                             """the capacity of the buffer queue is defined as factor*FLAGS.num_batch_join""")
 
+tf.app.flags.DEFINE_boolean('shuffle_files_when_train', True,
+                            """Whether shuffle tfrecords during the training phase""")
+
 
 
 def inputs(dataset, batch_size=None, num_preprocess_threads=None):
@@ -140,8 +143,11 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
 
     # Create filename_queue
     if train:
+      if not FLAGS.shuffle_files_when_train:
+          print("not shuffling files during the training phase")
+
       filename_queue = tf.train.string_input_producer(data_files,
-                                                      shuffle=True,
+                                                      shuffle=FLAGS.shuffle_files_when_train,
                                                       capacity=64)
     else:
       filename_queue = tf.train.string_input_producer(data_files,
@@ -168,13 +174,16 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
     # 1 image uses 299*299*3*4 bytes = 1MB
     # The default input_queue_memory_factor is 16 implying a shuffling queue
     # size: examples_per_shard * 16 * 1MB = 17.6GB
-    if train:
+    if train and FLAGS.shuffle_files_when_train:
       min_queue_examples = examples_per_shard * FLAGS.input_queue_memory_factor
       examples_queue = tf.RandomShuffleQueue(
           capacity=min_queue_examples + 3 * batch_size,
           min_after_dequeue=min_queue_examples,
           dtypes=[tf.string])
     else:
+      if FLAGS.shuffle_files_when_train == False:
+          print("using non random shuffle queue")
+
       examples_queue = tf.FIFOQueue(
           capacity=examples_per_shard + 3 * batch_size,
           dtypes=[tf.string])
@@ -232,7 +241,7 @@ def batch_inputs(dataset, batch_size, train, num_preprocess_threads=None,
                                                 enqueue_many=True)
                 joins.append(one_joined)
             print(FLAGS.num_batch_join, " batch_joins, each of them capacity is, ",
-                  reduced_factor*batch_size, " instances")
+                  reduced_factor*batch_size, " instances", " Warning: using this might be quite slow!")
 
         # add a buffering queue to remove the dequeue_many time
         capacity = FLAGS.num_batch_join * FLAGS.buffer_queue_capacity_multiply_factor

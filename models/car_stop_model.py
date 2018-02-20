@@ -1113,16 +1113,19 @@ def loss(logits, net_outputs, batch_size=None):
     net_outputs = copy.copy(net_outputs)
     # truncate logits and the corresponding net_output, to ignore the appending FLAGS.stop_future_frames labels
     # This will only affect the training, thus not affect the testing of any trained model
+
+    truncate_len = FLAGS.stop_future_frames
+
     future_labels = net_outputs[2]  # shape: N * F * 2
     shape = [x.value for x in future_labels.get_shape()]
     # logits[0] originally has shape [batch*nframe, num_classes]
     logits[0] = tf.reshape(logits[0], [shape[0], shape[1], logits[0].get_shape()[-1].value])
-    logits[0] = logits[0][:, :-FLAGS.stop_future_frames, :]
-    logits[0] = tf.reshape(logits[0], [shape[0]*(shape[1]-FLAGS.stop_future_frames), -1])
+    logits[0] = logits[0][:, :-truncate_len, :]
+    logits[0] = tf.reshape(logits[0], [shape[0]*(shape[1]-truncate_len), -1])
 
-    net_outputs[0] = net_outputs[0][:, :-FLAGS.stop_future_frames]
-    net_outputs[1] = net_outputs[1][:, :-FLAGS.stop_future_frames, :]
-    net_outputs[2] = net_outputs[2][:, :-FLAGS.stop_future_frames, :]
+    net_outputs[0] = net_outputs[0][:, :-truncate_len]
+    net_outputs[1] = net_outputs[1][:, :-truncate_len, :]
+    net_outputs[2] = net_outputs[2][:, :-truncate_len, :]
     # end of fixing last images doesn't have a true label
 
     if FLAGS.city_data:
