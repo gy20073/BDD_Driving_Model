@@ -288,6 +288,17 @@ def inference(net_inputs, num_classes, for_training=False, scope=None, initial_s
     activation_summaries(end_points, TOWER_NAME)
     return logits
 
+
+def save_object(object, message):
+    from datetime import datetime
+    fname = "debug_"+message+"_" + str(datetime.now()).replace(" ", "_") + ".pkl"
+    fname = os.path.join(FLAGS.train_dir, fname)
+    with open(fname, "wb") as f:
+        pickle.dump(object, f)
+
+    return 1
+
+
 def LRCN(net_inputs, num_classes, for_training, initial_state=None):
     # network inputs are list of tensors:
     # 5D images(NFHWC), valid labels (NF*1), egomotion list (NF*previous_steps*3), this video's name (string)
@@ -300,6 +311,12 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
             ctx = net_inputs[4]
     else:
         raise ValueError("not a valid dataset")
+
+    # begin debug
+    # holder = tf.py_func(save_object, [images, "images"], [tf.int64])[0]
+    # with tf.control_dependencies([holder]):
+    #    images = tf.identity(images)
+    # end debug
 
     ############# the CNN part #############
     # first reshape to 4D, since conv2d only takes in 4D input
@@ -1032,6 +1049,7 @@ def course_speed_to_joint_bin(labels):
     out = out / np.sum(out, axis=(1,2), keepdims=True)
 
     out = np.reshape(out, [l, n*n])
+
     return out
 
 
@@ -1064,6 +1082,7 @@ def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
     slim.losses.softmax_cross_entropy(future_predict, dense_labels,
                                       weight=masks,
                                       scope="softmax_loss_joint")
+
 
 
 def py_is_mkz(names, ntotal):
