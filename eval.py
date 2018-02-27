@@ -394,8 +394,8 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
     if FLAGS.output_visualizations:
       loss_v, labels_v, logits_v, tin_out_v = sess.run([loss_op, labels, logits, tensors_in + labels_in])
       # fix the visualization bug
-      logits_v = np.reshape(logits_v, (FLAGS.batch_size, FLAGS.n_sub_frame, -1))
-      print("the reshaped logits_v has a shape of:", logits_v.shape)
+      logits_v_reshape = np.reshape(logits_v, (FLAGS.batch_size, FLAGS.n_sub_frame, -1))
+      print("the reshaped logits_v has a shape of:", logits_v_reshape.shape)
 
       for isample in range(FLAGS.batch_size):
 
@@ -408,7 +408,7 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
         else:
           vis_func = getattr(util_car, FLAGS.vis_func)
         vis_func(tin_out_v,
-                              logits_v[isample, :, :],
+                              logits_v_reshape[isample, :, :],
                               15 / FLAGS.temporal_downsample_factor,
                               model,
                               isample,
