@@ -128,6 +128,7 @@ class MyDataset(Dataset):
     def num_examples_per_epoch(self):
         """Returns the number of examples in the data set."""
         # TODO: Edit number
+        return len(self.data_files())
 
         if self.subset == 'train':
             if FLAGS.retain_first_k_training_example > 0:
@@ -200,6 +201,9 @@ class MyDataset(Dataset):
         Raises:
           ValueError: if there are not data_files matching the subset.
         """
+        if hasattr(self, "data_files_cache"):
+            return self.data_files_cache
+
         print(FLAGS.data_dir,'IN DATA_FILES')
         # TODO: make sure file name pattern matches
         if FLAGS.low_res:
@@ -252,6 +256,8 @@ class MyDataset(Dataset):
         if FLAGS.use_non_random_shuffle:
             random.seed(a=1)
             random.shuffle(data_files)
+
+        self.data_files_cache = data_files
         return data_files
 
     def decode_jpeg(self, image_buffer, scope=None):
