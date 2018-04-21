@@ -5,6 +5,9 @@ from ffprobe import FFProbe
 
 
 def probe_file(filename):
+    '''
+        Probes the media file for metadata on length of the video (in seconds)
+    '''
     cmnd = ['ffprobe', '-show_format', '-pretty', filename]
     p = subprocess.Popen(cmnd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #print filename
@@ -16,13 +19,16 @@ def probe_file(filename):
         hour =  time[-3].split('=')[1]
         minute = time[-2]
         second = time[-1]
-    #print hour, minute, second
+        # Saving the time length (in seconds) of the video into the variable 'whole_time'
         whole_time = float(hour)*3600 + float(minute)*60 + float(second)
     return whole_time
     
 
 
 if __name__ == '__main__':
+    '''
+        Terminal command: python [dataset path]
+    '''
     dataset_path = sys.argv[1]
     output_index = os.path.join(dataset_path, "video_filtered_38_60.txt")
 
