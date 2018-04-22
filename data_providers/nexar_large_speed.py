@@ -202,7 +202,7 @@ class MyDataset(Dataset):
           ValueError: if there are not data_files matching the subset.
         """
         if hasattr(self, "data_files_cache"):
-            return self.data_files_cache
+            return copy.deepcopy(self.data_files_cache)
 
         print(FLAGS.data_dir,'IN DATA_FILES')
         # TODO: make sure file name pattern matches
@@ -258,7 +258,7 @@ class MyDataset(Dataset):
             random.shuffle(data_files)
 
         self.data_files_cache = data_files
-        return data_files
+        return copy.deepcopy(data_files)
 
     def decode_jpeg(self, image_buffer, scope=None):
         if FLAGS.fast_jpeg_decode == "pyfunc":

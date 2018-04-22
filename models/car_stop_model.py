@@ -113,6 +113,9 @@ tf.app.flags.DEFINE_float('discretize_bound_speed', 40,
                             '''the upper bound of speed, larger than the discretize_max_speed''')
 tf.app.flags.DEFINE_float('discretize_label_gaussian_sigma', 1.0,
                             '''the sigma parameter for gaussian smoothing''')
+tf.app.flags.DEFINE_float('vague_loss_true_label_belief_sigma', 1.0,
+                            '''the sigma parameter for gaussian smoothing in the vague loss''')
+
 tf.app.flags.DEFINE_float('discretize_min_prob', 1e-6,
                             '''min prob for each bin, avoid underflow''')
 tf.app.flags.DEFINE_string('discretize_bin_type', "log",
@@ -184,6 +187,12 @@ tf.app.flags.DEFINE_float('action_mapping_main_weight', 1.0,
 tf.app.flags.DEFINE_float('action_mapping_threshold', 0.05,
                            'C * max(thresh, |dist1-dist2|)')
 tf.app.flags.DEFINE_float('action_mapping_C', 100.0, '')
+
+tf.app.flags.DEFINE_string('loss_car_joint_type', "cross_entropy",
+                           'whether to use hinge or cross entropy for the loss car joint task')
+
+tf.app.flags.DEFINE_boolean('accurate_vague_loss', False,
+                            'whether to use MKZ accurate and Nexar vague loss')
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -619,7 +628,21 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
                                        activation_fn=None,
                                        normalizer_fn=None,
                                        biases_initializer=tf.zeros_initializer)]
+        # the first one must be what you are testing with, the second one be what you don't care about
+        # in this case, the first one is the new one, with new name; the second one is the old one with old name.
+        # This is a compatibility breaking change
+        logits = [logits[1], logits[0]]
 
+    if FLAGS.action_mapping_arch == "v3":
+        hw = FLAGS.discretize_n_bins
+        act = tf.reshape(logits[0], [shape[0]*shape[1], hw, hw, 1])
+
+        act = slim.conv2d(act, 5, [3, 3], 1, scope="conv_map_1", activation_fn=tf.nn.relu)
+        act = slim.conv2d(act, 5, [3, 3], 1, scope="conv_map_2", activation_fn=tf.nn.relu)
+        act = slim.conv2d(act, 1, [3, 3], 1, scope="conv_map_3", activation_fn=None)
+        act = tf.reshape(act, [shape[0]*shape[1], hw*hw])
+
+        logits = [act, logits[0]]
 
     return logits
     # The usage of logits from model.inference() output
@@ -1026,7 +1049,7 @@ def city_loss(city_prediction, seg_mask):
                              seg_mask,
                              weight=FLAGS.ptrain_weight)
 ##################### Loss Functions of the jointly discritized #########
-def course_speed_to_joint_bin(labels):
+def course_speed_to_joint_bin(labels, sigma_in):
     # each of the labels[i, :] is the course and speed
     # convert each pair to the corresponding bin location
     course, speed = course_speed_to_discrete(labels)
@@ -1043,7 +1066,7 @@ def course_speed_to_joint_bin(labels):
 
         # do the gaussian smoothing
         out[i, :, :] = gaussian_filter(out[i, :, :],
-                        sigma=FLAGS.discretize_label_gaussian_sigma,
+                        sigma=sigma_in,
                         mode='constant', cval=0.0)
     # renormalization of the distribution
     out = out / np.sum(out, axis=(1,2), keepdims=True)
@@ -1052,6 +1075,25 @@ def course_speed_to_joint_bin(labels):
 
     return out
 
+def hinge_loss_v2(logits, target, scope, div_nclass=True):
+    with tf.name_scope(scope, "hinge_loss", (logits, target)) as scope:
+        logits = tf.to_float(logits)
+        labels = tf.to_float(target)
+        logits.get_shape().assert_is_compatible_with(labels.get_shape())
+        # We first need to convert binary labels to -1/1 labels (as floats).
+        all_ones = tf.ones_like(labels)
+
+        # assuming there is only one ground truth
+        base = tf.reduce_sum(labels*logits, reduction_indices=-1, keep_dims=True)
+        losses = tf.nn.relu(tf.add(all_ones, logits-base))
+        losses = tf.reduce_sum(losses, reduction_indices=-1)-1
+        if div_nclass:
+            losses = losses / logits.get_shape()[-1].value
+            losses = losses * 5 # to avoid the loss being too small
+        losses = tf.reduce_mean(losses)
+        losses = tf.reshape(losses, [])
+        tf.add_to_collection(tf.GraphKeys.LOSSES, losses)
+        return losses
 
 def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
     # net_outputs contains is_stop, turn, locs
@@ -1061,7 +1103,7 @@ def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
     future_labels = tf.reshape(future_labels, [-1, num_classes])
 
     dense_labels = tf.py_func(course_speed_to_joint_bin,
-                              [future_labels],
+                              [future_labels, FLAGS.discretize_label_gaussian_sigma],
                               [tf.float32])[0]
 
     if masks is not None:
@@ -1079,9 +1121,77 @@ def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
         masks = 1.0
 
     future_predict = logits[0]
-    slim.losses.softmax_cross_entropy(future_predict, dense_labels,
-                                      weight=masks,
-                                      scope="softmax_loss_joint")
+    if FLAGS.loss_car_joint_type == "cross_entropy":
+        slim.losses.softmax_cross_entropy(future_predict, dense_labels,
+                                          weight=masks,
+                                          scope="softmax_loss_joint")
+    elif FLAGS.loss_car_joint_type == "hinge":
+        print("using hinge loss with loss_car_joint")
+        assert FLAGS.discretize_label_gaussian_sigma < 0.1, "disable smoothing when using the hinge loss"
+        assert masks == 1.0, "disable class_balance_path when using hinge loss"
+
+        losses = slim.losses.hinge_loss(logits=future_predict,
+                                        target=dense_labels,
+                                        scope="hinge_loss_car_joint")
+        losses = tf.reduce_mean(losses)
+        losses = tf.reshape(losses, [])
+        tf.add_to_collection(tf.GraphKeys.LOSSES, losses)
+    elif FLAGS.loss_car_joint_type == "hinge_v2":
+        print("using hinge loss with loss_car_joint v2")
+        assert  FLAGS.discretize_label_gaussian_sigma < 0.1, "disable smoothing when using the hinge loss"
+        assert masks == 1.0, "disable class_balance_path when using hinge loss"
+
+        hinge_loss_v2(logits=future_predict,
+                      target=dense_labels,
+                      scope="hinge_loss_car_joint")
+
+    else:
+        raise ValueError("loss_car_joint_type invalid: %s" % FLAGS.loss_car_joint_type)
+
+
+def loss_car_joint_vague(logits, net_outputs, batch_size=None, masks=None):
+    # net_outputs contains is_stop, turn, locs
+    future_labels = net_outputs[2]    # shape: N * F * 2
+    # reshape to 2 dimension
+    num_classes = future_labels.get_shape()[-1].value
+    future_labels = tf.reshape(future_labels, [-1, num_classes])
+    batch_size = future_labels.get_shape()[0].value
+
+    # has to set FLAGS.vague_loss_true_label_belief_sigma, a good value might be 1.0 or 1.5
+    # dense_labels has a size of l * n^2
+    # TODO: might also want to try uniform belief space
+    dense_labels = tf.py_func(course_speed_to_joint_bin,
+                              [future_labels, FLAGS.vague_loss_true_label_belief_sigma],
+                              [tf.float32])[0]
+
+    prediction = tf.nn.softmax(logits[0])
+    # the fake probabilities
+    fake_prob = tf.reduce_sum(prediction * dense_labels, 1)
+    epsilon = 1e-4
+    # take the -log and average
+    minus_log = -tf.log(fake_prob + epsilon)
+    minus_log.set_shape([batch_size])
+    slim.losses.compute_weighted_loss(minus_log, masks)
+
+
+def vague_loss_MKZ_Nexar(logits, net_outputs):
+    # compute the weight to see which are nexar / MKZ datasets
+    ninstance = logits[0].get_shape()[0].value
+    masks = tf.py_func(py_is_mkz,
+                       [net_outputs[-1], ninstance],
+                       [tf.float32])[
+        0]  # 1.0 if it's a MKZ data TODO: compute which are for MKZ and which are for nexar
+    masks.set_shape([ninstance])
+
+    # has to set the augment factor for MKZ
+    with tf.variable_scope("MKZ_loss"):
+        # the optimal smoothing for MKZ might be 0.5 or 0.0
+        loss_car_joint([logits[0]], net_outputs, masks=masks)
+
+    with tf.variable_scope("nexar_loss"):
+        # custom designed loss
+        # Here we only use one head to do both prediction, thus the logits[0] below is correct
+        loss_car_joint_vague([logits[0]], net_outputs, masks=1.0 - masks)
 
 
 
@@ -1137,10 +1247,16 @@ def loss(logits, net_outputs, batch_size=None):
 
     future_labels = net_outputs[2]  # shape: N * F * 2
     shape = [x.value for x in future_labels.get_shape()]
-    # logits[0] originally has shape [batch*nframe, num_classes]
-    logits[0] = tf.reshape(logits[0], [shape[0], shape[1], logits[0].get_shape()[-1].value])
-    logits[0] = logits[0][:, :-truncate_len, :]
-    logits[0] = tf.reshape(logits[0], [shape[0]*(shape[1]-truncate_len), -1])
+
+    def trunc_logits(logits, shape, truncate_len):
+        # logits[0] originally has shape [batch*nframe, num_classes]
+        logits[0] = tf.reshape(logits[0], [shape[0], shape[1], logits[0].get_shape()[-1].value])
+        logits[0] = logits[0][:, :-truncate_len, :]
+        logits[0] = tf.reshape(logits[0], [shape[0] * (shape[1] - truncate_len), -1])
+        return logits[0]
+    logits[0] = trunc_logits([logits[0]], shape, truncate_len)
+    if FLAGS.action_mapping_loss:
+        logits[1] = trunc_logits([logits[1]], shape, truncate_len)
 
     net_outputs[0] = net_outputs[0][:, :-truncate_len]
     net_outputs[1] = net_outputs[1][:, :-truncate_len, :]
@@ -1157,6 +1273,10 @@ def loss(logits, net_outputs, batch_size=None):
 
     if FLAGS.action_mapping_loss:
         loss2joint(logits, net_outputs)
+        return
+
+    if FLAGS.accurate_vague_loss:
+        vague_loss_MKZ_Nexar(logits, net_outputs)
         return
 
     func = globals()["loss_%s" % FLAGS.sub_arch_selection]
@@ -1498,6 +1618,16 @@ def stage_classic_finetune():
             ans[v.op.name] = 10.0
         else:
             ans[v.op.name] = 1.0
+    return ans
+
+def stage_new_head():
+    key = "_nexar/"
+    ans = {}
+    for v in tf.all_variables():
+        if key in v.op.name:
+            ans[v.op.name] = 1.0
+        else:
+            ans[v.op.name] = 0.0
     return ans
 
 def learning_rate_multipliers():
