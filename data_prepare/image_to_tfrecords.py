@@ -1,4 +1,4 @@
-from .prepare_tfrecords import _int64_feature, _float_feature, _bytes_feature
+from prepare_tfrecords import _int64_feature, _float_feature, _bytes_feature
 from PIL import Image
 import tensorflow as tf
 import numpy as np
@@ -6,6 +6,16 @@ import numpy as np
 SAMPLE_FILENAME_PAIRS = [("GTA_dataset/1518144524486_final.png", "GTA_dataset/1518144524486_id.png"),
         ("GTA_dataset/1518144525001_final.png", "GTA_dataset/1518144525001_id.png"),
         ("GTA_dataset/1518144525504_final.png", "GTA_dataset/1518144525504_id.png")]
+
+def convert_png_to_jpeg(filename):
+    """
+        Converts an image's format from 'png' to 'jpeg'
+    """
+    image = Image.open(filename)
+    rgb_image = image.convert('RGB')
+    new_filename = filename.replace('.png', '.jpeg')
+    rgb_image.save(new_filename)
+    return new_filename
 
 def convert_to_tfrecords(filename_pairs, tfrecord_filename='convertedImage.tfrecords'):
     """
@@ -16,6 +26,9 @@ def convert_to_tfrecords(filename_pairs, tfrecord_filename='convertedImage.tfrec
 
     for img_path, annotation_path in filename_pairs:
 
+        img_path = convert_png_to_jpeg(img_path)
+        annotation_path = convert_png_to_jpeg(annotation_path)
+        
         img = np.array(Image.open(img_path))
         annotation = np.array(Image.open(annotation_path))
 
