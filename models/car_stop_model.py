@@ -22,6 +22,7 @@ from scipy.ndimage import gaussian_filter
 from models.kaffe.caffenet import CaffeNet
 #from models.kaffe.caffenet_dilation import CaffeNet_dilation
 from models.kaffe.caffenet_dilation8 import CaffeNet_dilation8
+from models.kaffe.caffenet_from_pool5 import CaffeNet_from_pool5
 
 TOWER_NAME = 'tower'
 BATCHNORM_MOVING_AVERAGE_DECAY=0.9997
@@ -141,7 +142,7 @@ tf.app.flags.DEFINE_float('class_balance_epsilon', 0.01,
 tf.app.flags.DEFINE_string('temporal_net', "LSTM",
                             '''Which temporal net to use, could be LSTM or CNN_FC''')
 
-tf.app.flags.DEFINE_boolean('normalize_before_concat', True,
+tf.app.flags.DEFINE_boolean('normalize_before_concat', False,
                             '''normalization before feature concatenation''')
 tf.app.flags.DEFINE_string('unique_experiment_name', "",
                             '''the scope name of the architecture''')
@@ -193,6 +194,11 @@ tf.app.flags.DEFINE_string('loss_car_joint_type', "cross_entropy",
 
 tf.app.flags.DEFINE_boolean('accurate_vague_loss', False,
                             'whether to use MKZ accurate and Nexar vague loss')
+tf.app.flags.DEFINE_string('vague_loss_smoothing_func', "course_speed_to_joint_bin",
+                           'which smoothing function to use, when using the vague loss')
+
+tf.app.flags.DEFINE_boolean('seg_bottleneck_extra_original_pathway', False,
+                            'when using segmentation bottleneck, add a original pathway')
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -373,6 +379,20 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
     if FLAGS.city_data:
         city_features = privileged_training(net_inputs, num_classes, for_training, stage_status, images, shape)
 
+    # allow extra pathway besides the segmentation bottleneck path
+    if FLAGS.seg_bottleneck_extra_original_pathway:
+        print("adding the original pathway besides the segmentation bottleneck")
+        assert FLAGS.image_network_arch == "CaffeNet_dilation8"
+        assert FLAGS.cnn_feature == "conv5"
+        drop7 = CaffeNet_from_pool5(
+            {'conv5': image_features},
+            FLAGS.pretrained_model_path,
+            trainable=True,
+            use_dropout=use_dropout,
+            keep_prob=0.5)
+        drop7 = drop7.layers["drop7"]
+        drop7 = tf.reshape(drop7, [shape[0], shape[1], -1])
+
     # allow adding the motion tower, even without the city segmentation data.
     image_features = motion_tower(stage_status, image_features)
 
@@ -423,6 +443,9 @@ def LRCN(net_inputs, num_classes, for_training, initial_state=None):
 
             normalize_exceptions.append(len(all_features))
             all_features.append(speed)
+
+        if FLAGS.seg_bottleneck_extra_original_pathway:
+            all_features.append(drop7)
 
         ############# concatenate other information source #############
         if FLAGS.only_seg == 1 :
@@ -728,8 +751,9 @@ def privileged_training(net_inputs, num_classes, for_training, stage_status, ima
             pred = tf.py_func(segmentation_color, [pred], [tf.uint8])[0]
             pred.set_shape([pred_shape[0], pred_shape[1], pred_shape[2], 3])
 
-            pred = tf.image.resize_nearest_neighbor(pred,[shape[2], shape[3]])
+            pred = tf.image.resize_nearest_neighbor(pred,[shape[2], shape[3]], name="segmentation_pred_color")
             city_ims = tf.cast(city_ims, tf.uint8)
+            # concat the original image and the predicted label map in a horizontal / width direction
             pred = tf.concat(2,[city_ims, pred])
 
             tf.image_summary("segmentation_visualization", pred, max_images=113)
@@ -1148,6 +1172,42 @@ def loss_car_joint(logits, net_outputs, batch_size=None, masks=None):
     else:
         raise ValueError("loss_car_joint_type invalid: %s" % FLAGS.loss_car_joint_type)
 
+def course_speed_to_joint_bin_uniform(labels, sigma_in):
+    # each of the labels[i, :] is the course and speed
+    # convert each pair to the corresponding bin location
+    course, speed = course_speed_to_discrete(labels)
+
+    n = FLAGS.discretize_n_bins
+    l = len(course)
+
+    # follow the convention of speed first and speed second
+    out = np.zeros((l, n, n), dtype=np.float32)
+
+    for i, item in enumerate(zip(course, speed)):
+        ci, si = item
+
+        # setting a platue of size 3*3 around the ground truth
+        for cii in range(max(0, ci - 1), min(ci + 2, n)):
+            for sii in range(max(0, si - 1), min(si + 2, n)):
+                out[i, cii, sii] = 1.0
+        '''
+        for cii in range(max(0, ci - 3), min(ci + 4, n)):
+            for sii in range(max(0, si - 3), min(si + 4, n)):
+                dis = max(abs(cii - ci), abs(sii - si))
+                if dis <= 1:
+                    out[i, cii, sii] = 1.0
+                elif dis <= 2:
+                    out[i, cii, sii] = 0.3
+                elif dis <= 3:
+                    out[i, cii, sii] = 0.1
+        '''
+
+    # renormalization of the distribution
+    out = out / np.sum(out, axis=(1,2), keepdims=True)
+
+    out = np.reshape(out, [l, n*n])
+
+    return out
 
 def loss_car_joint_vague(logits, net_outputs, batch_size=None, masks=None):
     # net_outputs contains is_stop, turn, locs
@@ -1159,8 +1219,9 @@ def loss_car_joint_vague(logits, net_outputs, batch_size=None, masks=None):
 
     # has to set FLAGS.vague_loss_true_label_belief_sigma, a good value might be 1.0 or 1.5
     # dense_labels has a size of l * n^2
-    # TODO: might also want to try uniform belief space
-    dense_labels = tf.py_func(course_speed_to_joint_bin,
+    method = globals()[FLAGS.vague_loss_smoothing_func]
+
+    dense_labels = tf.py_func(method,
                               [future_labels, FLAGS.vague_loss_true_label_belief_sigma],
                               [tf.float32])[0]
 
@@ -1182,6 +1243,8 @@ def vague_loss_MKZ_Nexar(logits, net_outputs):
                        [tf.float32])[
         0]  # 1.0 if it's a MKZ data TODO: compute which are for MKZ and which are for nexar
     masks.set_shape([ninstance])
+
+    tf.scalar_summary("mask_sum_ie_mkz_count", tf.reduce_sum(masks))
 
     # has to set the augment factor for MKZ
     with tf.variable_scope("MKZ_loss"):

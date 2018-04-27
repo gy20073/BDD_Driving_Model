@@ -441,7 +441,7 @@ def draw_sector(image,
     icourse = np.searchsorted(course_samples, course_norm)
     ispeed = np.searchsorted(speed_samples, speed_norm)
 
-    green_portion = 1
+    green_portion = 0.5
     total = total_pdf[icourse, ispeed]
     if consistent_vis[0] == False:
         total_max = np.amax(total)
@@ -456,7 +456,7 @@ def draw_sector(image,
         #total = (total -np.log(MIN)) / (np.log(MAX) - np.log(MIN)) * 255
         total = (total - MIN) / (MAX - MIN)
         total = np.sqrt(total)
-        total = total * 255
+        total = total * 255 * green_portion
 
     # assign to image
     image[xy[:, 1], xy[:, 0], :] *= (1-green_portion)
@@ -471,14 +471,24 @@ def vis_continuous(tout, predict, frame_rate, car_stop_model,
     decoded = tout[0]
     speed = tout[1]
     name = tout[2]
-    highres = tout[3]
+    if FLAGS.city_data:
+        seg_image = tout[3]
+        highres = tout[4]
 
-    isstop = tout[4]
-    turn = tout[5]
-    locs = tout[6]
+        isstop = tout[5]
+        turn = tout[6]
+        locs = tout[7]
+    else:
+        highres = tout[3]
+
+        isstop = tout[4]
+        turn = tout[5]
+        locs = tout[6]
     decoded = highres
 
     images = copy.deepcopy(decoded[j, :, :, :, :])
+    print(images.shape)
+
     images = images.astype('float64')
     _, hi, wi, _ = images.shape
     locs = locs[j, :, :]

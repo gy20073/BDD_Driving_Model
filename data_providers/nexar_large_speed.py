@@ -909,9 +909,11 @@ class MyDataset(Dataset):
         # adding the raw images
         ins += batched[decoded_raw_loc:(decoded_raw_loc+1)]
 
-        if FLAGS.action_mapping_loss:
-            assert not FLAGS.city_data
-            assert not FLAGS.only_seg
+        if FLAGS.action_mapping_loss or FLAGS.accurate_vague_loss or FLAGS.inflate_MKZ_factor > 1:
+            print("adding the training file names to network_outputs")
+            if FLAGS.action_mapping_loss or FLAGS.accurate_vague_loss:
+                assert not FLAGS.city_data
+                assert not FLAGS.only_seg
             outs += [ins[-2]]
 
         # dropout non-stop videos

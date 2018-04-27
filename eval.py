@@ -14,6 +14,7 @@ import importlib
 import util_car
 from util import *
 from shutil import copyfile
+from subprocess import call
 
 import numpy as np
 import tensorflow as tf
@@ -81,6 +82,8 @@ tf.app.flags.DEFINE_boolean('save_best_model', False,
 
 tf.app.flags.DEFINE_string('eval_viz_id', "viz",
                             """the output folder name of the visualization""")
+tf.app.flags.DEFINE_boolean('visualize_segmentation', False,
+                            """save the best model during validation""")
 
 # the best error global recorder
 best_error = 1e9
@@ -387,12 +390,32 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
   print('%s: starting evaluation on (%s).' % (datetime.now(), FLAGS.subset))
   start_time = time.time()
   num_iter = int(math.ceil(FLAGS.num_examples / FLAGS.batch_size))
+
+  if FLAGS.visualize_segmentation:
+    # heuristic to get the segmentation for video output
+    stage_status = "TrainStage1_%s" % FLAGS.unique_experiment_name
+    graph = tf.get_default_graph()
+    seg = graph.get_tensor_by_name(FLAGS.arch_selection+"/"+stage_status+"_1/Ptrain/segmentation_fc8/BiasAdd:0")
+    print(seg)
+
+    pred = tf.argmax(seg, 3)
+    pred_shape = [x.value for x in pred.get_shape()]
+
+    pred = tf.py_func(model.segmentation_color, [pred], [tf.uint8])[0]
+    pred.set_shape([pred_shape[0], pred_shape[1], pred_shape[2], 3])
+
+    seg_vis = tf.image.resize_nearest_neighbor(pred, [360, 640], name="segmentation_pred_color")
+    seg_vis = tf.reshape(seg_vis, [FLAGS.batch_size, -1, 360, 640, 3])
+
   for step in range(num_iter):
     t0 = time.time()
     if coord.should_stop():
       break
     if FLAGS.output_visualizations:
-      loss_v, labels_v, logits_v, tin_out_v = sess.run([loss_op, labels, logits, tensors_in + labels_in])
+      if FLAGS.visualize_segmentation:
+        loss_v, labels_v, logits_v, tin_out_v, seg_vis_v = sess.run([loss_op, labels, logits, tensors_in + labels_in, seg_vis])
+      else:
+        loss_v, labels_v, logits_v, tin_out_v = sess.run([loss_op, labels, logits, tensors_in + labels_in])
       # fix the visualization bug
       logits_v_reshape = np.reshape(logits_v, (FLAGS.batch_size, FLAGS.n_sub_frame, -1))
       print("the reshaped logits_v has a shape of:", logits_v_reshape.shape)
@@ -421,6 +444,15 @@ def car_continuous(logits_all_in, labels_in, loss_op, sess, coord, summary_op, t
         short_name = short_name.split(".")[0]
         npz_filename = os.path.join(FLAGS.eval_dir, FLAGS.eval_viz_id, short_name + ".logit.npz")
         pickle.dump(logits_v, open(npz_filename, 'wb'))
+
+        if FLAGS.visualize_segmentation:
+          dir_name = os.path.join(FLAGS.eval_dir, FLAGS.eval_viz_id)
+          util_car.images2video(seg_vis_v[isample, :, :, :, :], 15 / FLAGS.temporal_downsample_factor,
+                                name=short_name+"_seg", dir_name=dir_name, highquality=True)
+          cmd = "ffmpeg -i "+dir_name+"/"+short_name+".mp4  -i "+ dir_name+"/"+short_name+"_seg.mp4 -filter_complex '[0:v]pad=iw*2:ih[int];[int][1:v]overlay=W/2:0[vid]' -map [vid] -c:v libx264 -crf 23 -preset veryfast "+ dir_name+"/"+short_name+"_withseg.mp4"
+          call(cmd, shell=True)
+          call("rm "+dir_name+"/"+short_name+".mp4", shell=True)
+          call("rm " + dir_name + "/" + short_name + "_seg.mp4", shell=True)
 
     else:
       loss_v, labels_v, logits_v = sess.run([loss_op, labels, logits])

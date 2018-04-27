@@ -359,3 +359,7 @@ class Network(object):
     def dropout(self, input, keep_prob, name):
         keep = 1 - self.use_dropout + (self.use_dropout * keep_prob)
         return tf.nn.dropout(input, keep, name=name)
+
+    @layer
+    def resize_nn(self, input, new_size, name):
+        return tf.image.resize_nearest_neighbor(input, new_size, align_corners=None, name=name)
