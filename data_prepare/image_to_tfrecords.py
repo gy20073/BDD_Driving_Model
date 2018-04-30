@@ -4,10 +4,6 @@ import tensorflow as tf
 import numpy as np
 import os
 
-SAMPLE_filename_list = [("GTA_dataset/1518144524486_final.png", "GTA_dataset/1518144524486_id.png"),
-        ("GTA_dataset/1518144525001_final.png", "GTA_dataset/1518144525001_id.png"),
-        ("GTA_dataset/1518144525504_final.png", "GTA_dataset/1518144525504_id.png")]
-
 def convert_png_to_jpeg(filename):
     """
         Converts an image's format from 'png' to 'jpeg'

@@ -1,26 +1,57 @@
 import unittest, image_to_tfrecords, math, os, sys
 import numpy as np
+import tensorflow as tf
 
 class TestImageToTfrecordsConversion(unittest.TestCase):
 
     def test_collect_images(self):
-        self.assertEqual('foo', 'FOO')
+        pass
 
     def test_convert_png_to_jpeg(self):
-        os.mkdir('.unittest')
-
-        self.assertTrue('FOO'.islower())
-        self.assertFalse('Foo'.isupper())
+        pass
 
     def test_convert_to_tfrecords(self):
         list_of_list_names = image_to_tfrecords.collect_images(BASE_FOLDER_PATH)
 
         index = 0
+        reconstructed_images = list()
+        original_images = list()
         for sublist in list_of_list_names:
             original_images = image_to_tfrecords.convert_to_tfrecords(sublist, ".unittest/batch_{}.tfrecords".format(index))
             index += 1
 
+            record_iterator = tf.python_io.tf_record_iterator(path=".unittest/batch_{}.tfrecords".format(index - 1))
 
+            for string_record in record_iterator:
+
+                example = tf.train.Example()
+                example.ParseFromString(string_record)
+
+                height = int(example.features.feature['image/height']
+                                             .int64_list
+                                             .value[0])
+
+                width = int(example.features.feature['image/width']
+                                            .int64_list
+                                            .value[0])
+
+                img_string = (example.features.feature['image/encoded']
+                                              .bytes_list
+                                              .value[0])
+
+                img_1d = np.fromstring(img_string, dtype=np.uint8)
+                print(img_1d)
+                reconstructed_img = img_1d.reshape((height, width, -1))
+
+
+                reconstructed_images.append(reconstructed_img)
+
+
+            for original_pair, reconstructed_pair in zip(original_images, reconstructed_images):
+                self.assertTrue(np.allclose(original_pair, reconstructed_pair))
+
+            reconstructed_images = list()
+            original_images = list()
 
 
     def test_split_list(self):
