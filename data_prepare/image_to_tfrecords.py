@@ -21,10 +21,10 @@ def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):
     """
         Converts a list of images into TFRecord
     """
-    writer = tf.python_io.TFRecordWriter(tfrecords_filename)
+    writer = tf.python_io.TFRecordWriter(tfrecord_filename)
     original_images = []
 
-    for img_path, annotation_path in filename_list:
+    for img_path in filename_list:
 
         img_path = convert_png_to_jpeg(img_path)
         img = np.array(Image.open(img_path))
@@ -35,7 +35,7 @@ def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):
         # of images to later read raw serialized string,
         # convert to 1d array and convert to respective
         # shape that image used to have.
-        height = tf.app.flags.image_height
+        # height = tf.app.flags.image_height
         height = img.shape[0]
         width = img.shape[1]
 
@@ -57,6 +57,7 @@ def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):
         writer.write(example.SerializeToString())
 
     writer.close()
+    return original_images
 
 def split_list(list, size=108):
     """
@@ -74,8 +75,10 @@ def collect_images(base_folder_path):
 
     for folder_name in os.listdir(base_folder_path):
         image_folder_path = os.path.join(base_folder_path, folder_name)
+        if not os.path.isdir(image_folder_path):
+            continue
         image_batch = list()
-        for image_name in os.listdir(image_folder):
+        for image_name in os.listdir(image_folder_path):
             if 'final.png' in image_name:
                 image_path = os.path.join(image_folder_path, image_name)
                 image_batch.append(image_path)
