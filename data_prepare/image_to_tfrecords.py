@@ -18,7 +18,8 @@ def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):
         Converts a list of images into TFRecord
     """
     writer = tf.python_io.TFRecordWriter(tfrecord_filename)
-    original_images = []
+    original_images = list()
+    raw_img_list = list()
 
     for img_path in filename_list:
 
@@ -39,18 +40,19 @@ def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):
         # Just for future check for correctness
         original_images.append(img)
         img_raw = img.tostring()
+        raw_img_list.append(img_raw)
 
-        example = tf.train.Example(features=tf.train.Features(feature={
-            'image/height': _int64_feature(height),
-            'image/width': _int64_feature(width),
-            'image/channel': _int64_feature(3),
-            'image/class/image_name':_bytes_feature([img_path]),
-            'image/format':_bytes_feature(['JPEG']),
-            'image/encoded': _bytes_feature(img_raw),
-            'image/speeds': _float_feature(0),
-        }))
+    example = tf.train.Example(features=tf.train.Features(feature={
+        'image/height': _int64_feature(height),
+        'image/width': _int64_feature(width),
+        'image/channel': _int64_feature(3),
+        'image/class/image_name':_bytes_feature([img_path]),
+        'image/format':_bytes_feature(['JPEG']),
+        'image/encoded': _bytes_feature(raw_img_list),
+        'image/speeds': _float_feature(0),
+    }))
 
-        writer.write(example.SerializeToString())
+    writer.write(example.SerializeToString())
 
     writer.close()
     return original_images
@@ -86,4 +88,4 @@ def collect_images(base_folder_path):
 
 
 if __name__ == '__main__':
-    assert(tf.app.flags.base_path, 'Need a path to the base folder!')
+    assert tf.app.flags.base_path, 'Need a path to the base folder!'

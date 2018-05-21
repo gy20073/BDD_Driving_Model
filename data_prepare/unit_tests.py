@@ -40,7 +40,6 @@ class TestImageToTfrecordsConversion(unittest.TestCase):
                                               .value[0])
 
                 img_1d = np.fromstring(img_string, dtype=np.uint8)
-                print(img_1d)
                 reconstructed_img = img_1d.reshape((height, width, -1))
 
 
