@@ -1,11 +1,19 @@
 import unittest, image_to_tfrecords, math, os, sys
 import numpy as np
 import tensorflow as tf
+import os, math
 
 class TestImageToTfrecordsConversion(unittest.TestCase):
 
     def test_collect_images(self):
-        pass
+        list_of_list_names = image_to_tfrecords.collect_images(BASE_FOLDER_PATH)
+        image_file_count = 0
+        for file in os.listdir(BASE_FOLDER_PATH):
+            file_path = os.path.join(BASE_FOLDER_PATH, file)
+            if os.path.isdir(file_path):
+                image_file_count += len(os.listdir(file_path))
+        print("Number of files found: {}\n".format(image_file_count))
+        self.assertEqual(int(math.ceil(image_file_count / 108.0)), len(list_of_list_names))
 
     def test_convert_png_to_jpeg(self):
         pass

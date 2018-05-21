@@ -77,7 +77,7 @@ def collect_images(base_folder_path):
             continue
         image_batch = list()
         for image_name in os.listdir(image_folder_path):
-            if 'final.png' in image_name:
+            if 'final' in image_name and '.png' in image_name:
                 image_path = os.path.join(image_folder_path, image_name)
                 image_batch.append(image_path)
         image_path_list += split_list(image_batch)
