@@ -11,7 +11,10 @@ import util_car
 import scipy.misc as misc
 import glob
 import multiprocessing
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 from PIL import Image
 import cv2
 import ctypes
@@ -69,7 +72,7 @@ tf.app.flags.DEFINE_string('fast_jpeg_decode', "default",
 #dataset specified FLAGS
 tf.app.flags.DEFINE_string('city_image_list','/data/hxu/fineGT/trainval_images.txt',
                            'the privilege training segmentation image index')
-tf.app.flags.DEFINE_string('city_label_list','/data/hxu/fineGT/trainval_labels.txt', 
+tf.app.flags.DEFINE_string('city_label_list','/data/hxu/fineGT/trainval_labels.txt',
                            'the privilege training segmentation label image index')
 tf.app.flags.DEFINE_integer('city_data',0,'if we want side training with segmentation, set this to 1')
 tf.app.flags.DEFINE_integer('only_seg',0, 'if we want to only use segmentation, set this to 1')
@@ -431,7 +434,7 @@ class MyDataset(Dataset):
             if not has_stop:
                 if np.random.rand() < drop_prob:
                     out[i] = False
-        
+
         return out
 
     @staticmethod
@@ -470,10 +473,14 @@ class MyDataset(Dataset):
                   'turn_left': 2, 'turn_right': 3,
                   'turn_left_slight': 4, 'turn_right_slight': 5,}
                   #'acceleration': 6, 'deceleration': 7}
-
-    turn_int2str={y: x for x, y in turn_str2int.iteritems()}
-    naction = np.sum(np.less_equal(0, np.array(turn_str2int.values())))
-
+    try:
+        turn_int2str={y: x for x, y in turn_str2int.iteritems()}
+    except AttributeError:
+        turn_int2str={y: x for x, y in turn_str2int.items()}
+    try:
+        naction = np.sum(np.less_equal(0, np.array(turn_str2int.values())))
+    except TypeError:
+        naction = np.sum(np.less_equal(0, np.array(list(turn_str2int.values()))))
     @staticmethod
     def turning_heuristics(speed_list, speed_limit_as_stop=0):
         course_list = MyDataset.to_course_list(speed_list)
@@ -668,7 +675,7 @@ class MyDataset(Dataset):
                               FLAGS.IM_HEIGHT / FLAGS.decode_downsample_factor,
                               FLAGS.IM_WIDTH / FLAGS.decode_downsample_factor, 1])
             return images
-    
+
     @staticmethod
     def parse_array(array):
 
@@ -682,10 +689,10 @@ class MyDataset(Dataset):
             dtype = np.float64
         return np.fromstring(array[8+4 * shape_size:], dtype=dtype).reshape(shape)
 
-    
+
     def read_array(self, array_buffer):
         fn = lambda array: MyDataset.parse_array(array)
-        ctx_decoded = map(fn, array_buffer)                       
+        ctx_decoded = map(fn, array_buffer)
         return [ctx_decoded]
 
 
@@ -872,7 +879,7 @@ class MyDataset(Dataset):
         if FLAGS.city_data:
             # city batch means how many batch does each video sequence forms
             FLAGS.city_batch = len_downsampled // FLAGS.n_sub_frame
-            
+
             # here we want to read in the cityscape data and downsample in the loop
             city_im_queue, city_seg_queue= self.queue_cityscape(FLAGS.city_image_list,
                                                                 FLAGS.city_label_list)
