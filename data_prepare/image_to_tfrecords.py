@@ -10,7 +10,7 @@ def convert_png_to_jpeg(filename):
     """
     image = Image.open(filename)
     new_filename = filename.replace('.png', '.jpeg')
-    image.save(new_filename)
+    image.save(new_filename, "JPEG")
     return new_filename
 
 def convert_to_tfrecords(filename_list, tfrecord_filename='batch.tfrecords'):

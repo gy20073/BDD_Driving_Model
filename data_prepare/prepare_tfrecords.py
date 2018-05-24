@@ -21,7 +21,10 @@ import scipy.ndimage
 import skimage
 from scipy.misc import imresize
 import matplotlib
-import StringIO
+try:
+    import StringIO
+except ImportError:
+    from io import StringIO
 import multiprocessing
 
 # might need to switch to this get_interpolated_speed when replaying GPS
@@ -30,7 +33,7 @@ import multiprocessing
 tf.app.flags.DEFINE_string('video_index', '/data/nx-bdd-20160929/video_filtered_index_38_60_sec.txt', 'filtered video indexing')
 tf.app.flags.DEFINE_string('output_directory', '/data/nx-bdd-20160929/tfrecord_fix_speed/', 'Training data directory')
 
-#tf.app.flags.DEFINE_integer('train_shards', 1024, 'Number of shards in training TFRecord files.') 
+#tf.app.flags.DEFINE_integer('train_shards', 1024, 'Number of shards in training TFRecord files.')
 #tf.app.flags.DEFINE_integer('validation_shards', 128, 'Number of shards in validation TFRecord files.')
 
 tf.app.flags.DEFINE_integer('num_threads', 16, 'Number of threads to preprocess the images.')
@@ -131,7 +134,7 @@ def read_one_video(video_path, jobid):
     if speeds.shape[0] < FLAGS.truncate_frames:
         print("skipping since speeds are too short!")
         return 0, False
-    
+
     # filter the too short videos
     duration, ratio = probe_file(video_path)
     if duration < (FLAGS.truncate_frames+1) * 1.0 / hz_res:
@@ -142,7 +145,7 @@ def read_one_video(video_path, jobid):
         # allow one second of displacement
         print("skipping since unequal speed length and image_list length")
         return 0, False
-    
+
     if not ratio:
         print("the ratio of video is incorrect!", video_path)
         return 0, False
@@ -152,10 +155,10 @@ def read_one_video(video_path, jobid):
 
     image_list=[]
     if FLAGS.low_res:
-        cmnd = ['ffmpeg', 
-                '-i', video_path, 
+        cmnd = ['ffmpeg',
+                '-i', video_path,
                 '-f', 'image2pipe',
-                '-loglevel', 'panic', 
+                '-loglevel', 'panic',
                 '-pix_fmt','rgb24',
                 '-r','1',
                 '-vcodec', 'rawvideo', '-']
@@ -176,8 +179,8 @@ def read_one_video(video_path, jobid):
             image_right_up = image[0:pixelh, WIDTH-pixelw:WIDTH]
 
             all_im = [image_left, image_right, image_left_up, image_right_up]
-            all_num = [np.sum(image_left), 
-                       np.sum(image_right), 
+            all_num = [np.sum(image_left),
+                       np.sum(image_right),
                        np.sum(image_left_up),
                        np.sum(image_right_up)]
             rank = np.argsort(all_num)
@@ -267,8 +270,8 @@ def parse_path(video_path, jobid):
     fprefix = fname.split(".")[0]
     cache_images = os.path.join(FLAGS.temp_dir_root, "prepare_tfrecords_image_temp_"+str(jobid))
     out_name = os.path.join(FLAGS.output_directory, fprefix+".tfrecords")
-    
-    # return all sorts of info: 
+
+    # return all sorts of info:
     # video_base_path, video_name_wo_prefix, cache_path, out_tfrecord_path
     return (fd, fprefix, cache_images, out_name)
 
@@ -280,7 +283,7 @@ def convert_one(video_path, jobid):
         if state:
             writer = tf.python_io.TFRecordWriter(out_name)
             writer.write(example.SerializeToString())
-            writer.close()   
+            writer.close()
 
 def p_convert(video_path_list, jobid):
     #start = time.time()
