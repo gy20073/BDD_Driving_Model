@@ -11,3 +11,4 @@ scratch.ipynb
 data_providers/near_dataset_sanity_check_harry.ipynb
 *.so
 private/
+data_prepare/.unittest

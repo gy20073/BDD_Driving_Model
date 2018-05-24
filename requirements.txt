@@ -1,0 +1,3 @@
+scikit-image
+opencv-python
+nose
